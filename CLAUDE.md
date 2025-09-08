@@ -1,11 +1,11 @@
 # Project Goal
-Headless Node.js TypeScript service that runs on Koyeb and calls `recipes-functions` endpoints using **Google-signed ID tokens** minted from a **service account JSON** secret.  
+Headless Node.js TypeScript service that calls `recipes-functions` endpoints using **Google-signed ID tokens** minted from a **service account JSON** secret.  
 - GROUP_ID is set **per service via env** (not from branch).  
-- No secrets in repo. Deploy with `npm run deploy` via Koyeb CLI.
+- No secrets in repo.
 
 # Env & Secrets
 - `FUNCTION_BASE_URL` → base HTTPS URL for Functions v2.
-- `GCP_SA_JSON` → full JSON key (injected via Koyeb secret).
+- `GCP_SA_JSON` → full JSON key (injected via environment).
 - `GROUP_ID` → short string identifying the group (e.g., `group-01`).
 
 # Behavior
@@ -30,9 +30,8 @@ Headless Node.js TypeScript service that runs on Koyeb and calls `recipes-functi
 - `dev` (ts-node)
 - `build` (tsc)
 - `start` (node dist)
-- `deploy` (Koyeb CLI: deploy service; attach env; secrets stored on Koyeb)
 
 # Acceptance
 - With env set locally, `npm run dev` calls Functions successfully.
 - Header `x-group-id` is always present.
-- `npm run deploy` works with Koyeb CLI; no creds stored in repo.
+- Service can be deployed; no creds stored in repo.
