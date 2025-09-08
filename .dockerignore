@@ -2,5 +2,10 @@ node_modules
 dist
 .git
 .vscode
-.env
-.koyeb.env
+.env*
+.koyeb.env*
+*.md
+API_DOCUMENTATION.md
+MCP_TOOLS.md
+README.md
+scripts/setup.sh
