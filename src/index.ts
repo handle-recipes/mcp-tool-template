@@ -2,6 +2,7 @@ import { GoogleAuthClient } from "./lib/auth";
 import { FirebaseFunctionsAPI } from "./api";
 import { GroupId } from "./types";
 import pRetry from "p-retry";
+import { spawn } from "child_process";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -32,130 +33,56 @@ function getConfig(): Config {
   return config as Config;
 }
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function performBenignWrite(api: FirebaseFunctionsAPI): Promise<void> {
-  const timestamp = new Date().toISOString();
-  const testRecipe = {
-    name: `Health Check Recipe - ${timestamp}`,
-    description: "This is a benign write operation for health monitoring",
-    servings: 1,
-    ingredients: [], // Would need actual ingredient IDs from Firebase
-    steps: [
-      { text: "Mix ingredients with care" },
-      { text: "Serve with reliability" },
-    ],
-    tags: ["monitoring", "health-check"],
-    categories: ["test"],
-  };
-
+async function performStartupHealthCheck(api: FirebaseFunctionsAPI): Promise<void> {
   try {
-    const createdRecipe = await api.createRecipe(testRecipe);
-    console.log(`✅ Created test recipe: ${createdRecipe.id}`);
-
-    await sleep(1000);
-
-    const deleteResult = await api.deleteRecipe(createdRecipe.id);
-    console.log(`🗑️  Cleaned up test recipe: ${deleteResult.message}`);
+    console.log("🔍 Performing startup health check...");
+    const recipes = await api.listRecipes({ limit: 1 });
+    console.log(`✅ Health check passed - API is responsive (found ${recipes.recipes.length} recipes)`);
   } catch (error) {
-    console.error("❌ Failed to perform benign write:", error);
+    console.error("❌ Startup health check failed:", error);
     throw error;
   }
 }
 
-async function runHealthCheck(api: FirebaseFunctionsAPI): Promise<void> {
-  try {
-    // Use listRecipes as a simple health check since there's no dedicated health endpoint
-    await api.listRecipes({ limit: 1 });
-    console.log(`💚 Health check passed - API is responsive`);
-  } catch (error) {
-    console.error("❌ Health check failed:", error);
-    throw error;
-  }
-}
+function startMCPServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    console.log("🚀 Starting MCP server...");
+    
+    const mcpProcess = spawn("node", ["dist/mcp-server.js"], {
+      stdio: "inherit",
+      env: process.env
+    });
 
-async function listRecipes(api: FirebaseFunctionsAPI): Promise<void> {
-  try {
-    const recipes = await api.listRecipes({ limit: 5 });
-    console.log(
-      `📋 Found ${recipes.recipes.length} recipes (has more: ${recipes.hasMore})`
-    );
+    mcpProcess.on("spawn", () => {
+      console.log("✅ MCP server started successfully");
+      resolve();
+    });
 
-    if (recipes.recipes.length > 0) {
-      recipes.recipes.forEach((recipe) => {
-        console.log(
-          `  - ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
-        );
-      });
-    }
-  } catch (error) {
-    console.error("❌ Failed to list recipes:", error);
-    throw error;
-  }
-}
+    mcpProcess.on("error", (error) => {
+      console.error("❌ Failed to start MCP server:", error);
+      reject(error);
+    });
 
-async function runCycle(
-  api: FirebaseFunctionsAPI,
-  cycleCount: number
-): Promise<void> {
-  console.log(`🔄 Starting cycle #${cycleCount}`);
-
-  await pRetry(
-    async () => {
-      await runHealthCheck(api);
-    },
-    {
-      retries: 3,
-      factor: 2,
-      minTimeout: 1000,
-      maxTimeout: 10000,
-      onFailedAttempt: (error) => {
-        console.log(
-          `⏳ Health check attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`
-        );
-      },
-    }
-  );
-
-  await pRetry(
-    async () => {
-      await listRecipes(api);
-    },
-    {
-      retries: 3,
-      factor: 2,
-      minTimeout: 1000,
-      maxTimeout: 10000,
-      onFailedAttempt: (error) => {
-        console.log(
-          `⏳ List recipes attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`
-        );
-      },
-    }
-  );
-
-  if (cycleCount % 5 === 0) {
-    await pRetry(
-      async () => {
-        await performBenignWrite(api);
-      },
-      {
-        retries: 3,
-        factor: 2,
-        minTimeout: 1000,
-        maxTimeout: 10000,
-        onFailedAttempt: (error) => {
-          console.log(
-            `⏳ Benign write attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`
-          );
-        },
+    mcpProcess.on("exit", (code) => {
+      if (code !== 0) {
+        console.error(`❌ MCP server exited with code ${code}`);
+        reject(new Error(`MCP server exited with code ${code}`));
       }
-    );
-  }
+    });
 
-  console.log(`✅ Completed cycle #${cycleCount}`);
+    // Handle shutdown
+    process.on("SIGINT", () => {
+      console.log("🔄 Shutting down MCP server...");
+      mcpProcess.kill("SIGINT");
+      process.exit(0);
+    });
+
+    process.on("SIGTERM", () => {
+      console.log("🔄 Shutting down MCP server...");
+      mcpProcess.kill("SIGTERM");
+      process.exit(0);
+    });
+  });
 }
 
 async function main(): Promise<void> {
@@ -177,23 +104,27 @@ async function main(): Promise<void> {
     console.log(`🔗 Connected to: ${config.functionBaseUrl}`);
     console.log(`👥 Group ID: ${config.groupId}`);
 
-    let cycleCount = 0;
-    const CYCLE_INTERVAL = 30000; // 30 seconds
-
-    while (true) {
-      cycleCount++;
-
-      try {
-        await runCycle(api, cycleCount);
-      } catch (error) {
-        console.error(`❌ Cycle #${cycleCount} failed:`, error);
+    // Perform startup health check with retry
+    await pRetry(
+      async () => {
+        await performStartupHealthCheck(api);
+      },
+      {
+        retries: 3,
+        factor: 2,
+        minTimeout: 2000,
+        maxTimeout: 10000,
+        onFailedAttempt: (error) => {
+          console.log(
+            `⏳ Health check attempt ${error.attemptNumber} failed. ${error.retriesLeft} retries left.`
+          );
+        },
       }
+    );
 
-      console.log(
-        `⏰ Waiting ${CYCLE_INTERVAL / 1000} seconds until next cycle...`
-      );
-      await sleep(CYCLE_INTERVAL);
-    }
+    // Start MCP server
+    await startMCPServer();
+
   } catch (error) {
     console.error("💥 Fatal error:", error);
     process.exit(1);
