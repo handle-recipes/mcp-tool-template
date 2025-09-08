@@ -35,6 +35,9 @@ export interface Ingredient {
   /** Allergen tags (e.g., "nuts", "gluten", "milk") */
   allergens: string[];
 
+  /** Optional image URL for the ingredient */
+  imageUrl?: string;
+
   /** Optional vector embedding of the ingredient name */
   embedding?: number[];
 

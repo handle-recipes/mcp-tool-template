@@ -13,6 +13,9 @@ interface MCPConfig {
   functionBaseUrl: string;
   groupId: GroupId;
   gcpServiceAccountJson: string;
+  odaUserAgent?: string;
+  odaClientToken?: string;
+  odaBaseUrl?: string;
 }
 
 function getConfig(): MCPConfig {
@@ -20,6 +23,9 @@ function getConfig(): MCPConfig {
     functionBaseUrl: process.env.FUNCTION_BASE_URL,
     groupId: process.env.GROUP_ID,
     gcpServiceAccountJson: process.env.GCP_SA_JSON,
+    odaUserAgent: process.env.ODA_USER_AGENT,
+    odaClientToken: process.env.ODA_CLIENT_TOKEN,
+    odaBaseUrl: process.env.ODA_BASE_URL,
   };
 
   if (!config.functionBaseUrl) {
@@ -67,7 +73,12 @@ const getServer = () => {
   // Register tools using the helper
   const setupTools = async () => {
     const apiInstance = await initializeAPI();
-    const tools = createRecipeTools(apiInstance);
+    const config = getConfig();
+    const authClient = new GoogleAuthClient({
+      gcpServiceAccountJson: config.gcpServiceAccountJson,
+      functionBaseUrl: config.functionBaseUrl,
+    });
+    const tools = createRecipeTools(apiInstance, authClient.getClient());
     registerTools(server, tools);
   };
 
@@ -92,7 +103,7 @@ app.post("/mcp", async (req, res) => {
   try {
     // Ensure tools are initialized before handling the request
     await ensureToolsInitialized();
-    
+
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });

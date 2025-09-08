@@ -32,6 +32,7 @@ export interface CreateIngredientRequest {
   aliases?: string[];
   categories?: string[];
   allergens?: string[];
+  imageUrl?: string;
 }
 
 export interface CreateIngredientResponse extends Ingredient {
@@ -44,6 +45,7 @@ export interface UpdateIngredientRequest {
   aliases?: string[];
   categories?: string[];
   allergens?: string[];
+  imageUrl?: string;
 }
 
 export interface UpdateIngredientResponse extends Ingredient {
@@ -89,6 +91,7 @@ export interface CreateRecipeRequest {
   tags?: string[];
   categories?: string[];
   sourceUrl?: string;
+  imageUrl?: string;
 }
 
 export interface CreateRecipeResponse extends Recipe {
@@ -105,6 +108,7 @@ export interface UpdateRecipeRequest {
   tags?: string[];
   categories?: string[];
   sourceUrl?: string;
+  imageUrl?: string;
 }
 
 export interface UpdateRecipeResponse extends Recipe {
