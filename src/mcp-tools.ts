@@ -52,7 +52,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       // id: z.string().describe("The ID of the ingredient to retrieve"),
     }),
     handler: async ({ name, categories, allergens, aliases }) => {
-      const result = await api.createIngredient(name, categories, allergens, aliases);
+      const result = await api.createIngredient({name, categories, allergens, aliases});
       return {
         content: [
           {
@@ -62,7 +62,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `ID: ${result.id}\n` +
               `Aliases: ${result.aliases.join(", ") || "None"}\n` +
               `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}\n`
               // `Created: ${new Date(
               //   result.createdAt.seconds * 1000
               // ).toISOString()}\n` +
