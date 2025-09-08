@@ -1,31 +1,29 @@
-# Use Node.js 20 LTS
-FROM node:20-alpine
-
-# Set working directory
+# --- deps (dev) ---
+FROM node:20-slim AS deps
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy source code
-COPY . .
-
-# Build the application
+# --- build ---
+FROM node:20-slim AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
 
-# Expose port (if needed)
+# --- prod deps (small runtime) ---
+FROM node:20-slim AS prod-deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# --- runtime ---
+FROM node:20-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY package*.json ./
+COPY --from=build /app/dist ./dist
 EXPOSE 3000
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S recipes -u 1001 -G nodejs
-
-# Change ownership of the app directory
-RUN chown -R recipes:nodejs /app
-USER recipes
-
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]

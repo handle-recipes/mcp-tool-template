@@ -1,12 +1,6 @@
 node_modules
-npm-debug.log
-.env
-.env.local
-.env.example
 dist
 .git
-.gitignore
-README.md
-.nyc_output
-coverage
-.DS_Store
+.vscode
+.env
+.koyeb.env
