@@ -1,30 +1,51 @@
-# --- deps (dev) ---
-FROM node:20-slim AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+# Use Node.js 20 Alpine image for smaller size and better security
+FROM node:20-alpine
 
-# --- build ---
-FROM node:20-slim AS build
+# Set working directory
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+
+# Install dumb-init for proper signal handling in containers
+RUN apk add --no-cache dumb-init
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+  adduser -S recipes -u 1001 -G nodejs
+
+# Copy package files first for better Docker layer caching
 COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && \
+  npm cache clean --force
+
+# Copy TypeScript configuration
 COPY tsconfig.json ./
-COPY src ./src
+
+# Copy source code
+COPY src/ ./src/
+
+# Build TypeScript to JavaScript
 RUN npm run build
 
-# --- prod deps (small runtime) ---
-FROM node:20-slim AS prod-deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
+# Remove development dependencies and source files to reduce image size
+RUN npm prune --production && \
+  rm -rf src/ tsconfig.json
 
-# --- runtime ---
-FROM node:20-slim
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY package*.json ./
-COPY --from=build /app/dist ./dist
+# Change ownership of the app directory to the nodejs user
+RUN chown -R recipes:nodejs /app
+
+# Switch to non-root user
+USER recipes
+
+# Expose the port that the app runs on
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["npm", "start"]
