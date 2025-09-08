@@ -56,11 +56,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `ID: ${result.id}\n` +
               `Aliases: ${result.aliases.join(", ") || "None"}\n` +
               `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
+              `Allergens: ${result.allergens.join(", ") || "None"}\n`
           },
         ],
       };
@@ -85,8 +81,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       const ingredientsList = result.ingredients
         .map(
           (ing) =>
-            `- ${ing.name} (${ing.id}) - Categories: ${
-              ing.categories.join(", ") || "None"
+            `- ${ing.name} (${ing.id}) - Categories: ${ing.categories.join(", ") || "None"
             }`
         )
         .join("\n");
@@ -118,16 +113,14 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             ing.unit === "free_text"
               ? ing.quantityText
               : `${ing.quantity || ""} ${ing.unit}`;
-          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
-            ing.note ? ` - ${ing.note}` : ""
-          }`;
+          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${ing.note ? ` - ${ing.note}` : ""
+            }`;
         })
         .join("\n");
       const stepsList = result.steps
         .map(
           (step, i) =>
-            `${i + 1}. ${step.text}${
-              step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
+            `${i + 1}. ${step.text}${step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
             }`
         )
         .join("\n");
@@ -155,6 +148,83 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
                 result.updatedAt.seconds * 1000
               ).toISOString()}\n` +
               `Created by Group: ${result.createdByGroupId}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe",
+    schema: z.object({
+      name: z.string().describe("The name of the recipe"),
+      description: z.string().describe("A short description of the recipe"),
+      servings: z.number().min(1).describe("Number of servings"),
+      ingredients: z.array(
+        z.object({
+          ingredientId: z.string().describe("The ID of the ingredient"),
+          quantity: z.number().optional().describe("The quantity of the ingredient"),
+          unit: z.string().describe("The unit of measurement for the ingredient"),
+          quantityText: z.string().optional().describe("Free-text quantity (if unit is 'free_text')"),
+          note: z.string().optional().describe("Additional notes for the ingredient"),
+        })
+      ),
+      steps: z.array(
+        z.object({
+          text: z.string().describe("Instruction text"),
+          imageUrl: z.string().optional().describe("Optional step image URL"),
+          equipment: z.array(z.string()).optional().describe("Optional equipment needed"),
+        })
+      ),
+      tags: z.array(z.string()).optional().describe("Free-text tags"),
+      categories: z.array(z.string()).optional().describe("Recipe categories"),
+      sourceUrl: z.string().optional().describe("Source attribution URL"),
+    }),
+    handler: async ({
+      name,
+      description,
+      servings,
+      ingredients,
+      steps,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const result = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients: ingredients.map((ing) => ({
+          ingredientId: ing.ingredientId,
+          quantity: ing.quantity,
+          unit: ing.unit as "g" | "kg" | "ml" | "l" | "piece" | "free_text",
+          quantityText: ing.quantityText,
+          note: ing.note,
+        })),
+        steps: steps.map((step) => ({
+          text: step.text,
+          imageUrl: step.imageUrl,
+          equipment: step.equipment,
+        })),
+        tags: tags || [],
+        categories: categories || [],
+        sourceUrl,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created recipe: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Slug: ${result.slug}\n` +
+              `Servings: ${result.servings}\n` +
+              `Tags: ${result.tags.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Source URL: ${result.sourceUrl || "None"}\n` +
+              `Ingredients: ${result.ingredients.length}\n` +
+              `Steps: ${result.steps.length}\n`,
           },
         ],
       };
