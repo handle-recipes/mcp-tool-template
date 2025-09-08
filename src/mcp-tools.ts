@@ -10,24 +10,38 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the ingredient to retrieve"),
     }),
     handler: async ({ id }) => {
-      const result = await api.getIngredient(id);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Ingredient: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.getIngredient(id);
+        
+        const createdAtText = result.createdAt?.seconds 
+          ? new Date(result.createdAt.seconds * 1000).toISOString()
+          : "Unknown";
+        
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Ingredient: ${result.name}\n` +
+                `ID: ${result.id}\n` +
+                `Aliases: ${result.aliases?.join(", ") || "None"}\n` +
+                `Categories: ${result.categories?.join(", ") || "None"}\n` +
+                `Allergens: ${result.allergens?.join(", ") || "None"}\n` +
+                `Created: ${createdAtText}\n` +
+                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error getting ingredient: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -45,26 +59,37 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Number of ingredients to skip for pagination (default: 0)"),
     }),
     handler: async ({ limit, offset }) => {
-      const result = await api.listIngredients({ limit, offset });
-      const ingredientsList = result.ingredients
-        .map(
-          (ing) =>
-            `- ${ing.name} (${ing.id}) - Categories: ${
-              ing.categories.join(", ") || "None"
-            }`
-        )
-        .join("\n");
+      try {
+        const result = await api.listIngredients({ limit, offset });
+        const ingredientsList = result.ingredients
+          ?.map(
+            (ing) =>
+              `- ${ing.name} (${ing.id}) - Categories: ${
+                ing.categories?.join(", ") || "None"
+              }`
+          )
+          .join("\n") || "None";
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Found ${result.ingredients.length} ingredients:\n\n${ingredientsList}\n\n` +
-              `Has more results: ${result.hasMore}`,
-          },
-        ],
-      };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Found ${result.ingredients?.length || 0} ingredients:\n\n${ingredientsList}\n\n` +
+                `Has more results: ${result.hasMore || false}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error listing ingredients: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -75,53 +100,70 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the recipe to retrieve"),
     }),
     handler: async ({ id }) => {
-      const result = await api.getRecipe(id);
-      const ingredientsList = result.ingredients
-        .map((ing) => {
-          const quantityText =
-            ing.unit === "free_text"
-              ? ing.quantityText
-              : `${ing.quantity || ""} ${ing.unit}`;
-          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
-            ing.note ? ` - ${ing.note}` : ""
-          }`;
-        })
-        .join("\n");
-      const stepsList = result.steps
-        .map(
-          (step, i) =>
-            `${i + 1}. ${step.text}${
-              step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
-            }`
-        )
-        .join("\n");
+      try {
+        const result = await api.getRecipe(id);
+        
+        const ingredientsList = result.ingredients
+          ?.map((ing) => {
+            const quantityText =
+              ing.unit === "free_text"
+                ? ing.quantityText
+                : `${ing.quantity || ""} ${ing.unit}`;
+            return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
+              ing.note ? ` - ${ing.note}` : ""
+            }`;
+          })
+          .join("\n") || "None";
+        
+        const stepsList = result.steps
+          ?.map(
+            (step, i) =>
+              `${i + 1}. ${step.text}${
+                step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
+              }`
+          )
+          .join("\n") || "None";
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Recipe: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Slug: ${result.slug}\n` +
-              `Description: ${result.description}\n` +
-              `Servings: ${result.servings}\n` +
-              `Tags: ${result.tags.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Source URL: ${result.sourceUrl || "None"}\n` +
-              `Image URL: ${result.imageUrl || "None"}\n\n` +
-              `Ingredients:\n${ingredientsList}\n\n` +
-              `Steps:\n${stepsList}\n\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Updated: ${new Date(
-                result.updatedAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
-          },
-        ],
-      };
+        const createdAtText = result.createdAt?.seconds 
+          ? new Date(result.createdAt.seconds * 1000).toISOString()
+          : "Unknown";
+        
+        const updatedAtText = result.updatedAt?.seconds 
+          ? new Date(result.updatedAt.seconds * 1000).toISOString()
+          : "Unknown";
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Recipe: ${result.name}\n` +
+                `ID: ${result.id}\n` +
+                `Slug: ${result.slug || "Unknown"}\n` +
+                `Description: ${result.description}\n` +
+                `Servings: ${result.servings}\n` +
+                `Tags: ${result.tags?.join(", ") || "None"}\n` +
+                `Categories: ${result.categories?.join(", ") || "None"}\n` +
+                `Source URL: ${result.sourceUrl || "None"}\n` +
+                `Image URL: ${result.imageUrl || "None"}\n\n` +
+                `Ingredients:\n${ingredientsList}\n\n` +
+                `Steps:\n${stepsList}\n\n` +
+                `Created: ${createdAtText}\n` +
+                `Updated: ${updatedAtText}\n` +
+                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error getting recipe: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -139,24 +181,35 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Number of recipes to skip for pagination (default: 0)"),
     }),
     handler: async ({ limit, offset }) => {
-      const result = await api.listRecipes({ limit, offset });
-      const recipesList = result.recipes
-        .map(
-          (recipe) =>
-            `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
-        )
-        .join("\n");
+      try {
+        const result = await api.listRecipes({ limit, offset });
+        const recipesList = result.recipes
+          ?.map(
+            (recipe) =>
+              `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
+          )
+          .join("\n") || "None";
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Found ${result.recipes.length} recipes:\n\n${recipesList}\n\n` +
-              `Has more results: ${result.hasMore}`,
-          },
-        ],
-      };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Found ${result.recipes?.length || 0} recipes:\n\n${recipesList}\n\n` +
+                `Has more results: ${result.hasMore || false}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error listing recipes: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -185,33 +238,44 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Maximum number of results (1-50, default: 20)"),
     }),
     handler: async ({ query, ingredients, tags, categories, limit }) => {
-      const result = await api.searchRecipes({
-        query,
-        ingredients,
-        tags,
-        categories,
-        limit,
-      });
-      const recipesList = result.recipes
-        .map(
-          (recipe) =>
-            `- ${recipe.name} (${recipe.id}) - ${recipe.description.substring(
-              0,
-              100
-            )}...`
-        )
-        .join("\n");
+      try {
+        const result = await api.searchRecipes({
+          query,
+          ingredients,
+          tags,
+          categories,
+          limit,
+        });
+        const recipesList = result.recipes
+          ?.map(
+            (recipe) =>
+              `- ${recipe.name} (${recipe.id}) - ${recipe.description?.substring(
+                0,
+                100
+              ) || "No description"}...`
+          )
+          .join("\n") || "None";
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Search results for "${result.query}":\n` +
-              `Total found: ${result.totalFound}\n\n${recipesList}`,
-          },
-        ],
-      };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Search results for "${result.query}":\n` +
+                `Total found: ${result.totalFound || 0}\n\n${recipesList}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error searching recipes: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -234,29 +298,43 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Allergens present in the ingredient"),
     }),
     handler: async ({ name, aliases, categories, allergens }) => {
-      const result = await api.createIngredient({
-        name,
-        aliases,
-        categories,
-        allergens,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Created ingredient: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.createIngredient({
+          name,
+          aliases,
+          categories,
+          allergens,
+        });
+        
+        const createdAtText = result.createdAt?.seconds 
+          ? new Date(result.createdAt.seconds * 1000).toISOString()
+          : "Unknown";
+        
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Created ingredient: ${result.name}\n` +
+                `ID: ${result.id}\n` +
+                `Aliases: ${result.aliases?.join(", ") || "None"}\n` +
+                `Categories: ${result.categories?.join(", ") || "None"}\n` +
+                `Allergens: ${result.allergens?.join(", ") || "None"}\n` +
+                `Created: ${createdAtText}\n` +
+                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error creating ingredient: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -280,30 +358,44 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("New allergens for the ingredient"),
     }),
     handler: async ({ id, name, aliases, categories, allergens }) => {
-      const result = await api.updateIngredient(id, {
-        id,
-        name,
-        aliases,
-        categories,
-        allergens,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Updated ingredient: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
-              `Updated: ${new Date(
-                result.updatedAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.updateIngredient(id, {
+          id,
+          name,
+          aliases,
+          categories,
+          allergens,
+        });
+        
+        const updatedAtText = result.updatedAt?.seconds 
+          ? new Date(result.updatedAt.seconds * 1000).toISOString()
+          : "Unknown";
+        
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Updated ingredient: ${result.name}\n` +
+                `ID: ${result.id}\n` +
+                `Aliases: ${result.aliases?.join(", ") || "None"}\n` +
+                `Categories: ${result.categories?.join(", ") || "None"}\n` +
+                `Allergens: ${result.allergens?.join(", ") || "None"}\n` +
+                `Updated: ${updatedAtText}\n` +
+                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error updating ingredient: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -314,15 +406,26 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the ingredient to delete"),
     }),
     handler: async ({ id }) => {
-      const result = await api.deleteIngredient(id);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Deleted ingredient: ${result.message}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.deleteIngredient(id);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Deleted ingredient: ${result.message}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error deleting ingredient: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -383,38 +486,52 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      const result = await api.createRecipe({
-        name,
-        description,
-        servings,
-        ingredients,
-        steps,
-        tags,
-        categories,
-        sourceUrl,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Created recipe: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Slug: ${result.slug}\n` +
-              `Description: ${result.description}\n` +
-              `Servings: ${result.servings}\n` +
-              `Ingredients: ${result.ingredients.length} items\n` +
-              `Steps: ${result.steps.length} steps\n` +
-              `Tags: ${result.tags.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Source URL: ${result.sourceUrl || "None"}\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.createRecipe({
+          name,
+          description,
+          servings,
+          ingredients,
+          steps,
+          tags,
+          categories,
+          sourceUrl,
+        });
+        
+        const createdAtText = result.createdAt?.seconds 
+          ? new Date(result.createdAt.seconds * 1000).toISOString()
+          : "Unknown";
+        
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Created recipe: ${result.name}\n` +
+                `ID: ${result.id}\n` +
+                `Slug: ${result.slug || "Unknown"}\n` +
+                `Description: ${result.description}\n` +
+                `Servings: ${result.servings}\n` +
+                `Ingredients: ${result.ingredients?.length || 0} items\n` +
+                `Steps: ${result.steps?.length || 0} steps\n` +
+                `Tags: ${result.tags?.join(", ") || "None"}\n` +
+                `Categories: ${result.categories?.join(", ") || "None"}\n` +
+                `Source URL: ${result.sourceUrl || "None"}\n` +
+                `Created: ${createdAtText}\n` +
+                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error creating recipe: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -479,39 +596,53 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      const result = await api.updateRecipe(id, {
-        id,
-        name,
-        description,
-        servings,
-        ingredients,
-        steps,
-        tags,
-        categories,
-        sourceUrl,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Updated recipe: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Slug: ${result.slug}\n` +
-              `Description: ${result.description}\n` +
-              `Servings: ${result.servings}\n` +
-              `Ingredients: ${result.ingredients.length} items\n` +
-              `Steps: ${result.steps.length} steps\n` +
-              `Tags: ${result.tags.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Source URL: ${result.sourceUrl || "None"}\n` +
-              `Updated: ${new Date(
-                result.updatedAt.seconds * 1000
-              ).toISOString()}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.updateRecipe(id, {
+          id,
+          name,
+          description,
+          servings,
+          ingredients,
+          steps,
+          tags,
+          categories,
+          sourceUrl,
+        });
+        
+        const updatedAtText = result.updatedAt?.seconds 
+          ? new Date(result.updatedAt.seconds * 1000).toISOString()
+          : "Unknown";
+        
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Updated recipe: ${result.name}\n` +
+                `ID: ${result.id}\n` +
+                `Slug: ${result.slug || "Unknown"}\n` +
+                `Description: ${result.description}\n` +
+                `Servings: ${result.servings}\n` +
+                `Ingredients: ${result.ingredients?.length || 0} items\n` +
+                `Steps: ${result.steps?.length || 0} steps\n` +
+                `Tags: ${result.tags?.join(", ") || "None"}\n` +
+                `Categories: ${result.categories?.join(", ") || "None"}\n` +
+                `Source URL: ${result.sourceUrl || "None"}\n` +
+                `Updated: ${updatedAtText}\n` +
+                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error updating recipe: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -522,15 +653,26 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the recipe to delete"),
     }),
     handler: async ({ id }) => {
-      const result = await api.deleteRecipe(id);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Deleted recipe: ${result.message}`,
-          },
-        ],
-      };
+      try {
+        const result = await api.deleteRecipe(id);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Deleted recipe: ${result.message}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error deleting recipe: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 ];
