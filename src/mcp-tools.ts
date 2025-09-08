@@ -32,6 +32,46 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   }),
 
   createMCPTool({
+    name: "create_ingredient",
+    description: "Create a new ingredient",
+    schema: z.object({
+      name: z.string().describe("The name of the ingredient"),
+      aliases: z.array(z.string()).describe("The aliases of the ingredient"),
+      categories: z
+        .array(z.string())
+        .describe("The categories of the ingredient"),
+      allergens: z
+        .array(z.string())
+        .describe("The allergens of the ingredient"),
+    }),
+    handler: async ({ name, aliases, categories, allergens }) => {
+      const result = await api.createIngredient({
+        name,
+        aliases,
+        categories,
+        allergens,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
+              `Created: ${new Date(
+                result.createdAt.seconds * 1000
+              ).toISOString()}\n` +
+              `Created by Group: ${result.createdByGroupId}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
     name: "list_ingredients",
     description: "List all ingredients for the group with optional pagination",
     schema: z.object({
@@ -162,7 +202,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "search_recipes",
-    description: "Search recipes using keyword-based search with optional filtering",
+    description:
+      "Search recipes using keyword-based search with optional filtering",
     schema: z.object({
       query: z
         .string()
