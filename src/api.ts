@@ -51,30 +51,29 @@ export class FirebaseFunctionsAPI {
   }
 
   async updateIngredient(id: string, request: UpdateIngredientRequest): Promise<UpdateIngredientResponse> {
-    const response = await this.client.put(`/ingredientsUpdate/${id}`, request, {
+    const response = await this.client.post('/ingredientsUpdate', { id, ...request }, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async deleteIngredient(id: string): Promise<DeleteIngredientResponse> {
-    const response = await this.client.delete(`/ingredientsDelete/${id}`, {
+    const response = await this.client.post('/ingredientsDelete', { id }, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async getIngredient(id: string): Promise<GetIngredientResponse> {
-    const response = await this.client.get(`/ingredientsGet/${id}`, {
+    const response = await this.client.post('/ingredientsGet', { id }, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async listIngredients(params?: PaginationParams): Promise<ListIngredientsResponse> {
-    const response = await this.client.get('/ingredientsList', {
+    const response = await this.client.post('/ingredientsList', params || {}, {
       headers: this.getHeaders(),
-      params,
     });
     return response.data;
   }
@@ -91,30 +90,29 @@ export class FirebaseFunctionsAPI {
   }
 
   async updateRecipe(id: string, request: UpdateRecipeRequest): Promise<UpdateRecipeResponse> {
-    const response = await this.client.put(`/recipesUpdate/${id}`, request, {
+    const response = await this.client.post('/recipesUpdate', { id, ...request }, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async deleteRecipe(id: string): Promise<DeleteRecipeResponse> {
-    const response = await this.client.delete(`/recipesDelete/${id}`, {
+    const response = await this.client.post('/recipesDelete', { id }, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async getRecipe(id: string): Promise<GetRecipeResponse> {
-    const response = await this.client.get(`/recipesGet/${id}`, {
+    const response = await this.client.post('/recipesGet', { id }, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async listRecipes(params?: PaginationParams): Promise<ListRecipesResponse> {
-    const response = await this.client.get('/recipesList', {
+    const response = await this.client.post('/recipesList', params || {}, {
       headers: this.getHeaders(),
-      params,
     });
     return response.data;
   }
