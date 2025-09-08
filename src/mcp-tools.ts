@@ -30,6 +30,31 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       };
     },
   }),
+  createMCPTool({
+    name: "change_ingredient_name",
+    description: "Change the name of an ingredient",
+    schema: z.object({
+      id: z.string().describe("The ID of the ingredient to retrieve"),
+      name: z.string().describe("The new name of the ingredient"),
+    }),
+    handler: async ({ id, name }) => {
+      const result = await api.updateIngredient(id, { id, name });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
+              `Created by Group: ${result.createdByGroupId}`,
+          },
+        ],
+      };
+    },
+  }),
 
   createMCPTool({
     name: "create_ingredient",
