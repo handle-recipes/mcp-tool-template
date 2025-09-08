@@ -4,6 +4,51 @@ import { FirebaseFunctionsAPI } from "./api";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
+    name: "scale_recipe",
+    description: "Scale a recipe to a desired number of servings. Fetches the recipe by ID, scales ingredient quantities, and returns the scaled recipe.",
+    schema: z.object({
+      id: z.string().describe("The ID of the recipe to scale"),
+      targetServings: z.number().describe("The desired number of servings"),
+    }),
+    handler: async ({ id, targetServings }) => {
+      try {
+        const recipe = await api.getRecipe(id);
+        if (!recipe.servings || recipe.servings <= 0 || targetServings <= 0) {
+          throw new Error("Invalid servings value");
+        }
+        const scaleFactor = targetServings / recipe.servings;
+        const scaledIngredients = recipe.ingredients.map(ing => {
+          if (typeof ing.quantity === "number" && ing.unit !== "free_text") {
+            return { ...ing, quantity: ing.quantity * scaleFactor };
+          }
+          return { ...ing };
+        });
+        const scaledRecipe = {
+          ...recipe,
+          servings: targetServings,
+          ingredients: scaledIngredients,
+        };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(scaledRecipe, null, 2),
+            },
+          ],
+        };
+      } catch (err: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${err.message}`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+  createMCPTool({
     name: "create_ingredient",
     description: "Create a new ingredient with name, aliases, categories, and allergens.",
     schema: z.object({
