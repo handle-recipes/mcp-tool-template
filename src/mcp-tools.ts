@@ -31,6 +31,48 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     },
   }),
 
+
+  createMCPTool({
+    name: "create_ingredient",
+    description: "Create a single ingredient",
+    schema: z.object({
+        name: z.string().describe("Name of ingredient"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Optional array of categories to filter by"),
+      allergens: z
+        .array(z.string())
+        .optional()
+        .describe("Optional array of allergens to filter by"),
+      aliases: z
+        .array(z.string())
+        .optional()
+        .describe("Optional array of aliases to filter by"),
+      // id: z.string().describe("The ID of the ingredient to retrieve"),
+    }),
+    handler: async ({ name, categories, allergens, aliases }) => {
+      const result = await api.createIngredient(name, categories, allergens, aliases);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
+              // `Created: ${new Date(
+              //   result.createdAt.seconds * 1000
+              // ).toISOString()}\n` +
+              // `Created by Group: ${result.createdByGroupId}`,
+          },
+        ],
+      };
+    },
+  }),
+
   createMCPTool({
     name: "list_ingredients",
     description: "List all ingredients for the group with optional pagination",
