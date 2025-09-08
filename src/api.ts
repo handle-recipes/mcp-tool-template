@@ -1,5 +1,11 @@
-import { AxiosInstance } from 'axios';
-import { GroupId } from './types';
+import { AxiosInstance } from "axios";
+import { GroupId } from "./types";
+
+interface PaginationParams {
+  limit?: string | number;
+  offset?: string | number;
+}
+
 import {
   // Ingredient types
   CreateIngredientRequest,
@@ -9,7 +15,6 @@ import {
   GetIngredientResponse,
   ListIngredientsResponse,
   DeleteIngredientResponse,
-  PaginationParams,
   // Recipe types
   CreateRecipeRequest,
   CreateRecipeResponse,
@@ -21,7 +26,7 @@ import {
   // Search types
   SearchRecipesRequest,
   SearchRecipesResponse,
-} from './apiTypes';
+} from "./apiTypes";
 
 export class FirebaseFunctionsAPI {
   private client: AxiosInstance;
@@ -34,8 +39,8 @@ export class FirebaseFunctionsAPI {
 
   private getHeaders() {
     return {
-      'x-group-id': this.groupId,
-      'Content-Type': 'application/json',
+      "x-group-id": this.groupId,
+      "Content-Type": "application/json",
     };
   }
 
@@ -43,36 +48,56 @@ export class FirebaseFunctionsAPI {
   // Ingredient API methods
   // ----------------------
 
-  async createIngredient(request: CreateIngredientRequest): Promise<CreateIngredientResponse> {
-    const response = await this.client.post('/ingredientsCreate', request, {
+  async createIngredient(
+    request: CreateIngredientRequest
+  ): Promise<CreateIngredientResponse> {
+    const response = await this.client.post("/ingredientsCreate", request, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
-  async updateIngredient(id: string, request: UpdateIngredientRequest): Promise<UpdateIngredientResponse> {
-    const response = await this.client.post('/ingredientsUpdate', { id, ...request }, {
-      headers: this.getHeaders(),
-    });
+  async updateIngredient(
+    id: string,
+    request: UpdateIngredientRequest
+  ): Promise<UpdateIngredientResponse> {
+    const requestWithId = { ...request, id };
+    const response = await this.client.post(
+      "/ingredientsUpdate",
+      requestWithId,
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 
   async deleteIngredient(id: string): Promise<DeleteIngredientResponse> {
-    const response = await this.client.post('/ingredientsDelete', { id }, {
-      headers: this.getHeaders(),
-    });
+    const response = await this.client.post(
+      "/ingredientsDelete",
+      { id },
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 
   async getIngredient(id: string): Promise<GetIngredientResponse> {
-    const response = await this.client.post('/ingredientsGet', { id }, {
-      headers: this.getHeaders(),
-    });
+    const response = await this.client.post(
+      "/ingredientsGet",
+      { id },
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 
-  async listIngredients(params?: PaginationParams): Promise<ListIngredientsResponse> {
-    const response = await this.client.post('/ingredientsList', params || {}, {
+  async listIngredients(
+    params?: PaginationParams
+  ): Promise<ListIngredientsResponse> {
+    const response = await this.client.post("/ingredientsList", params || {}, {
       headers: this.getHeaders(),
     });
     return response.data;
@@ -82,36 +107,50 @@ export class FirebaseFunctionsAPI {
   // Recipe API methods
   // ----------------------
 
-  async createRecipe(request: CreateRecipeRequest): Promise<CreateRecipeResponse> {
-    const response = await this.client.post('/recipesCreate', request, {
+  async createRecipe(
+    request: CreateRecipeRequest
+  ): Promise<CreateRecipeResponse> {
+    const response = await this.client.post("/recipesCreate", request, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
-  async updateRecipe(id: string, request: UpdateRecipeRequest): Promise<UpdateRecipeResponse> {
-    const response = await this.client.post('/recipesUpdate', { id, ...request }, {
+  async updateRecipe(
+    id: string,
+    request: UpdateRecipeRequest
+  ): Promise<UpdateRecipeResponse> {
+    const requestWithId = { ...request, id };
+    const response = await this.client.post("/recipesUpdate", requestWithId, {
       headers: this.getHeaders(),
     });
     return response.data;
   }
 
   async deleteRecipe(id: string): Promise<DeleteRecipeResponse> {
-    const response = await this.client.post('/recipesDelete', { id }, {
-      headers: this.getHeaders(),
-    });
+    const response = await this.client.post(
+      "/recipesDelete",
+      { id },
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 
   async getRecipe(id: string): Promise<GetRecipeResponse> {
-    const response = await this.client.post('/recipesGet', { id }, {
-      headers: this.getHeaders(),
-    });
+    const response = await this.client.post(
+      "/recipesGet",
+      { id },
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 
   async listRecipes(params?: PaginationParams): Promise<ListRecipesResponse> {
-    const response = await this.client.post('/recipesList', params || {}, {
+    const response = await this.client.post("/recipesList", params || {}, {
       headers: this.getHeaders(),
     });
     return response.data;
@@ -121,8 +160,10 @@ export class FirebaseFunctionsAPI {
   // Search API methods
   // ----------------------
 
-  async searchRecipes(request: SearchRecipesRequest): Promise<SearchRecipesResponse> {
-    const response = await this.client.post('/recipesSearch', request, {
+  async searchRecipes(
+    request: SearchRecipesRequest
+  ): Promise<SearchRecipesResponse> {
+    const response = await this.client.post("/recipesSearch", request, {
       headers: this.getHeaders(),
     });
     return response.data;

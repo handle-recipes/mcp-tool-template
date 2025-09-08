@@ -18,11 +18,6 @@ export interface ApiError {
   error: string;
 }
 
-export interface PaginationParams {
-  limit?: string;
-  offset?: string;
-}
-
 export interface PaginatedResponse<T> {
   hasMore: boolean;
   data: T[];
@@ -44,6 +39,7 @@ export interface CreateIngredientResponse extends Ingredient {
 }
 
 export interface UpdateIngredientRequest {
+  id: string;
   name?: string;
   aliases?: string[];
   categories?: string[];
@@ -54,13 +50,26 @@ export interface UpdateIngredientResponse extends Ingredient {
   id: string;
 }
 
+export interface GetIngredientRequest {
+  id: string;
+}
+
 export interface GetIngredientResponse extends Ingredient {
   id: string;
+}
+
+export interface ListIngredientsRequest {
+  limit?: number;
+  offset?: number;
 }
 
 export interface ListIngredientsResponse {
   ingredients: (Ingredient & { id: string })[];
   hasMore: boolean;
+}
+
+export interface DeleteIngredientRequest {
+  id: string;
 }
 
 export interface DeleteIngredientResponse {
@@ -87,6 +96,7 @@ export interface CreateRecipeResponse extends Recipe {
 }
 
 export interface UpdateRecipeRequest {
+  id: string;
   name?: string;
   description?: string;
   servings?: number;
@@ -101,13 +111,26 @@ export interface UpdateRecipeResponse extends Recipe {
   id: string;
 }
 
+export interface GetRecipeRequest {
+  id: string;
+}
+
 export interface GetRecipeResponse extends Recipe {
   id: string;
+}
+
+export interface ListRecipesRequest {
+  limit?: number;
+  offset?: number;
 }
 
 export interface ListRecipesResponse {
   recipes: (Recipe & { id: string })[];
   hasMore: boolean;
+}
+
+export interface DeleteRecipeRequest {
+  id: string;
 }
 
 export interface DeleteRecipeResponse {
@@ -160,28 +183,27 @@ export interface ApiEndpoints {
     response: CreateIngredientResponse;
   };
   ingredientsUpdate: {
-    method: "PUT";
-    path: "/ingredientsUpdate/{id}";
-    params: { id: string };
+    method: "POST";
+    path: "/ingredientsUpdate";
     request: UpdateIngredientRequest;
     response: UpdateIngredientResponse;
   };
   ingredientsDelete: {
-    method: "DELETE";
-    path: "/ingredientsDelete/{id}";
-    params: { id: string };
+    method: "POST";
+    path: "/ingredientsDelete";
+    request: DeleteIngredientRequest;
     response: DeleteIngredientResponse;
   };
   ingredientsGet: {
-    method: "GET";
-    path: "/ingredientsGet/{id}";
-    params: { id: string };
+    method: "POST";
+    path: "/ingredientsGet";
+    request: GetIngredientRequest;
     response: GetIngredientResponse;
   };
   ingredientsList: {
-    method: "GET";
+    method: "POST";
     path: "/ingredientsList";
-    query?: PaginationParams;
+    request?: ListIngredientsRequest;
     response: ListIngredientsResponse;
   };
 
@@ -193,28 +215,27 @@ export interface ApiEndpoints {
     response: CreateRecipeResponse;
   };
   recipesUpdate: {
-    method: "PUT";
-    path: "/recipesUpdate/{id}";
-    params: { id: string };
+    method: "POST";
+    path: "/recipesUpdate";
     request: UpdateRecipeRequest;
     response: UpdateRecipeResponse;
   };
   recipesDelete: {
-    method: "DELETE";
-    path: "/recipesDelete/{id}";
-    params: { id: string };
+    method: "POST";
+    path: "/recipesDelete";
+    request: DeleteRecipeRequest;
     response: DeleteRecipeResponse;
   };
   recipesGet: {
-    method: "GET";
-    path: "/recipesGet/{id}";
-    params: { id: string };
+    method: "POST";
+    path: "/recipesGet";
+    request: GetRecipeRequest;
     response: GetRecipeResponse;
   };
   recipesList: {
-    method: "GET";
+    method: "POST";
     path: "/recipesList";
-    query?: PaginationParams;
+    request?: ListRecipesRequest;
     response: ListRecipesResponse;
   };
 
@@ -260,15 +281,15 @@ export function isApiError(obj: unknown): obj is ApiError {
 export function hasRequestBody<T extends EndpointName>(
   endpoint: T
 ): endpoint is T & { request: EndpointRequest<T> } {
-  const ep = endpoint as string;
-  return !ep.includes("get") && !ep.includes("list") && !ep.includes("delete");
+  // All endpoints now use POST with request bodies
+  return true;
 }
 
 export function hasUrlParams<T extends EndpointName>(
   endpoint: T
 ): endpoint is T & { params: EndpointParams<T> } {
-  const ep = endpoint as string;
-  return ep.includes("update") || ep.includes("delete") || ep.includes("get");
+  // No endpoints use URL params anymore - all data is in request body
+  return false;
 }
 
 // ----------------------
@@ -285,7 +306,16 @@ export function hasUrlParams<T extends EndpointName>(
  *   endpoint: T,
  *   request: EndpointRequest<T>
  * ): Promise<EndpointResponse<T>> {
- *   // Implementation here
+ *   const response = await fetch(`${baseUrl}/${endpoint}`, {
+ *     method: 'POST',
+ *     headers: {
+ *       'Content-Type': 'application/json',
+ *       'Authorization': `Bearer ${idToken}`,
+ *       'x-group-id': groupId
+ *     },
+ *     body: JSON.stringify(request)
+ *   });
+ *   return response.json();
  * }
  *
  * // Usage:
@@ -293,6 +323,15 @@ export function hasUrlParams<T extends EndpointName>(
  *   name: 'Tomato',
  *   categories: ['vegetable'],
  *   allergens: []
+ * });
+ *
+ * const recipe = await callApi('recipesGet', {
+ *   id: 'recipe-123'
+ * });
+ *
+ * const updatedIngredient = await callApi('ingredientsUpdate', {
+ *   id: 'ingredient-456',
+ *   name: 'Roma Tomato'
  * });
  * ```
  */
