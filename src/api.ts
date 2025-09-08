@@ -2,7 +2,7 @@ import { AxiosInstance } from "axios";
 import { GroupId } from "./types";
 
 interface PaginationParams {
-  limit?: string | number;
+  limit?:  string | number;
   offset?: string | number;
 }
 

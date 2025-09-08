@@ -214,4 +214,34 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       };
     },
   }),
+
+  
+  createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe",
+    schema: z.object({
+      limit: z
+        .number()
+        .optional()
+        .describe("Number of recipes to return (default: 20)"),
+      offset: z
+        .number()
+        .optional()
+        .describe("Number of recipes to skip for pagination (default: 0)"),
+    }),
+    handler: async ({ name, description, servings, ingredients, steps, tags, categories, sourceUrl }) => {
+      const result = await api.createRecipe({ name, description, servings, ingredients, steps, tags, categories, sourceUrl });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created recipe:\n\n` +
+              `- ${result.name} with id (${result.id}) - ${result.servings} servings\n\n`,
+          },
+        ],
+      };
+    },
+  }),
+
 ];
