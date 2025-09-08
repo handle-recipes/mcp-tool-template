@@ -21,9 +21,6 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `Aliases: ${result.aliases.join(", ") || "None"}\n` +
               `Categories: ${result.categories.join(", ") || "None"}\n` +
               `Allergens: ${result.allergens.join(", ") || "None"}\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
               `Created by Group: ${result.createdByGroupId}`,
           },
         ],
@@ -112,9 +109,6 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `Image URL: ${result.imageUrl || "None"}\n\n` +
               `Ingredients:\n${ingredientsList}\n\n` +
               `Steps:\n${stepsList}\n\n` +
-              `Created: ${new Date(
-                result.createdAt.seconds * 1000
-              ).toISOString()}\n` +
               `Updated: ${new Date(
                 result.updatedAt.seconds * 1000
               ).toISOString()}\n` +
@@ -162,7 +156,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "search_recipes",
-    description: "Search recipes using keyword-based search with optional filtering",
+    description:
+      "Search recipes using keyword-based search with optional filtering",
     schema: z.object({
       query: z
         .string()
