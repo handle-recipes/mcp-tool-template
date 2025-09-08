@@ -281,43 +281,6 @@ const getServer = () => {
     }
   );
 
-  server.tool(
-    "semantic_search_recipes",
-    "Search recipes using AI-powered semantic search based on natural language queries",
-    {
-      query: z
-        .string()
-        .describe(
-          'Natural language search query (e.g., "healthy dinner with chicken")'
-        ),
-      topK: z
-        .number()
-        .optional()
-        .describe("Maximum number of results to return (1-50, default: 8)"),
-    },
-    async ({ query, topK }) => {
-      const api = await initializeAPI();
-      const result = await api.semanticSearchRecipes({ query, topK });
-      const recipesList = result.recipes
-        .map(
-          (recipe) =>
-            `- ${recipe.name} (${recipe.id}) - ${recipe.description.substring(
-              0,
-              100
-            )}...`
-        )
-        .join("\n");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Semantic search results for "${result.query}" (top ${result.topK}):\n\n${recipesList}`,
-          },
-        ],
-      };
-    }
-  );
 
   return server;
 };
@@ -354,7 +317,7 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
-app.get("/mcp", async (req, res) => {
+app.get("/mcp", async (_req, res) => {
   console.log("Received GET MCP request");
   res.writeHead(405).end(
     JSON.stringify({

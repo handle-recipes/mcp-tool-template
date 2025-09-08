@@ -16,7 +16,6 @@ The following MCP tools are provided for read operations:
 
 ### Search
 - **`search_recipes`**: Keyword-based recipe search with filtering
-- **`semantic_search_recipes`**: AI-powered semantic search using natural language
 
 ## Running the MCP Server
 
@@ -122,4 +121,3 @@ Example tool calls:
 - `get_ingredient` with `{"id": "ingredient-123"}`
 - `list_recipes` with `{"limit": "10", "offset": "0"}`  
 - `search_recipes` with `{"query": "chocolate cake", "tags": ["dessert"]}`
-- `semantic_search_recipes` with `{"query": "healthy dinner with chicken", "topK": 5}`

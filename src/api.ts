@@ -21,8 +21,6 @@ import {
   // Search types
   SearchRecipesRequest,
   SearchRecipesResponse,
-  SemanticSearchRequest,
-  SemanticSearchResponse,
 } from './apiTypes';
 
 export class FirebaseFunctionsAPI {
@@ -127,13 +125,6 @@ export class FirebaseFunctionsAPI {
 
   async searchRecipes(request: SearchRecipesRequest): Promise<SearchRecipesResponse> {
     const response = await this.client.post('/recipesSearch', request, {
-      headers: this.getHeaders(),
-    });
-    return response.data;
-  }
-
-  async semanticSearchRecipes(request: SemanticSearchRequest): Promise<SemanticSearchResponse> {
-    const response = await this.client.post('/recipesSemanticSearch', request, {
       headers: this.getHeaders(),
     });
     return response.data;
