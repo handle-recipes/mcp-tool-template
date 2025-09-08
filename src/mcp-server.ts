@@ -98,11 +98,11 @@ const getServer = () => {
     "List all ingredients for the group with optional pagination",
     {
       limit: z
-        .string()
+        .number()
         .optional()
         .describe("Number of ingredients to return (default: 50)"),
       offset: z
-        .string()
+        .number()
         .optional()
         .describe("Number of ingredients to skip for pagination (default: 0)"),
     },
@@ -194,11 +194,11 @@ const getServer = () => {
     "List all recipes for the group with optional pagination",
     {
       limit: z
-        .string()
+        .number()
         .optional()
         .describe("Number of recipes to return (default: 20)"),
       offset: z
-        .string()
+        .number()
         .optional()
         .describe("Number of recipes to skip for pagination (default: 0)"),
     },
