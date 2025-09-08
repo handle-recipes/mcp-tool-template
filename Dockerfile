@@ -14,8 +14,8 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy package files first for better Docker layer caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && \
+# Install dependencies (including dev dependencies for build)
+RUN npm ci && \
   npm cache clean --force
 
 # Copy TypeScript configuration
