@@ -1,10 +1,11 @@
 import { GoogleAuthClient } from './lib/auth';
-import { RecipesAPI } from './api';
+import { FirebaseFunctionsAPI } from './api';
+import { GroupId } from './types';
 import pRetry from 'p-retry';
 
 interface Config {
   functionBaseUrl: string;
-  groupId: string;
+  groupId: GroupId;
   gcpServiceAccountJson: string;
 }
 
@@ -32,13 +33,19 @@ async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function performBenignWrite(api: RecipesAPI): Promise<void> {
+async function performBenignWrite(api: FirebaseFunctionsAPI): Promise<void> {
   const timestamp = new Date().toISOString();
   const testRecipe = {
     name: `Health Check Recipe - ${timestamp}`,
     description: 'This is a benign write operation for health monitoring',
-    ingredients: ['1 cup monitoring', '2 tbsp automation'],
-    instructions: ['Mix ingredients', 'Serve with reliability'],
+    servings: 1,
+    ingredients: [], // Would need actual ingredient IDs from Firebase
+    steps: [
+      { text: 'Mix ingredients with care' },
+      { text: 'Serve with reliability' }
+    ],
+    tags: ['monitoring', 'health-check'],
+    categories: ['test'],
   };
 
   try {
@@ -47,32 +54,33 @@ async function performBenignWrite(api: RecipesAPI): Promise<void> {
     
     await sleep(1000);
     
-    await api.deleteRecipe(createdRecipe.id);
-    console.log(`🗑️  Cleaned up test recipe: ${createdRecipe.id}`);
+    const deleteResult = await api.deleteRecipe(createdRecipe.id);
+    console.log(`🗑️  Cleaned up test recipe: ${deleteResult.message}`);
   } catch (error) {
     console.error('❌ Failed to perform benign write:', error);
     throw error;
   }
 }
 
-async function runHealthCheck(api: RecipesAPI): Promise<void> {
+async function runHealthCheck(api: FirebaseFunctionsAPI): Promise<void> {
   try {
-    const health = await api.healthCheck();
-    console.log(`💚 Health check passed:`, health);
+    // Use listRecipes as a simple health check since there's no dedicated health endpoint
+    await api.listRecipes({ limit: '1' });
+    console.log(`💚 Health check passed - API is responsive`);
   } catch (error) {
     console.error('❌ Health check failed:', error);
     throw error;
   }
 }
 
-async function listRecipes(api: RecipesAPI): Promise<void> {
+async function listRecipes(api: FirebaseFunctionsAPI): Promise<void> {
   try {
-    const recipes = await api.listRecipes(1, 5);
-    console.log(`📋 Found ${recipes.recipes.length} recipes (total: ${recipes.total || 'unknown'})`);
+    const recipes = await api.listRecipes({ limit: '5' });
+    console.log(`📋 Found ${recipes.recipes.length} recipes (has more: ${recipes.hasMore})`);
     
     if (recipes.recipes.length > 0) {
       recipes.recipes.forEach(recipe => {
-        console.log(`  - ${recipe.name} (${recipe.id})`);
+        console.log(`  - ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`);
       });
     }
   } catch (error) {
@@ -81,7 +89,7 @@ async function listRecipes(api: RecipesAPI): Promise<void> {
   }
 }
 
-async function runCycle(api: RecipesAPI, cycleCount: number): Promise<void> {
+async function runCycle(api: FirebaseFunctionsAPI, cycleCount: number): Promise<void> {
   console.log(`🔄 Starting cycle #${cycleCount}`);
   
   await pRetry(async () => {
@@ -136,7 +144,7 @@ async function main(): Promise<void> {
       functionBaseUrl: config.functionBaseUrl,
     });
     
-    const api = new RecipesAPI(authClient.getClient(), config.groupId);
+    const api = new FirebaseFunctionsAPI(authClient.getClient(), config.groupId);
     
     console.log(`🔗 Connected to: ${config.functionBaseUrl}`);
     console.log(`👥 Group ID: ${config.groupId}`);
