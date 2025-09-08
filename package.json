@@ -13,7 +13,8 @@
     "mcp": "ts-node src/mcp-server.ts",
     "mcp:build": "tsc && node dist/mcp-server.js",
     "mcp:dev": "ts-node src/mcp-server.ts",
-    "deploy": "echo 'Deploy CLI placeholder - implement deployment logic here'"
+    "setup": "bash scripts/setup.sh",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
