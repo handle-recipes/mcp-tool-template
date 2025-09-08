@@ -1,18 +1,45 @@
 // types.ts
-// Shared models for recipes + ingredients across viewer / functions / MCP servers.
+// Shared models for recipes + ingredients across viewer / functions / MCP
+// servers.
 
 // ----------------------
 // Common / utility types
 // ----------------------
 export type FirestoreTimestamp = { seconds: number; nanoseconds: number };
 
-export type GroupId = string; // Injected into MCP servers via ENV and forwarded in requests
+// Injected into MCP servers via ENV and forwarded in requests
+export type GroupId = string;
 
-export const UNITS = ["g", "kg", "ml", "l", "piece", "free_text"] as const;
+export const UNITS = [
+  // Metric weight
+  "g",
+  "kg",
+  // Metric volume
+  "ml",
+  "l",
+  // Imperial/US weight
+  "oz",
+  "lb",
+  // Imperial/US volume
+  "tsp",
+  "tbsp",
+  "fl oz",
+  "cup",
+  "pint",
+  "quart",
+  "gallon",
+  // Count
+  "piece",
+  // Free form
+  "free_text",
+] as const;
 /**
  * Units:
- * - Metric only + "piece"
- * - "free_text" = quantity is expressed in text (quantityText) and unit is visually omitted.
+ * - Metric: g, kg, ml, l
+ * - Imperial/US: oz, lb, tsp, tbsp, fl oz, cup, pint, quart, gallon
+ * - Count: piece
+ * - "free_text" = quantity is expressed in text (quantityText) and unit
+ *   is visually omitted.
  */
 export type Unit = (typeof UNITS)[number];
 
@@ -34,9 +61,6 @@ export interface Ingredient {
 
   /** Allergen tags (e.g., "nuts", "gluten", "milk") */
   allergens: string[];
-
-  /** Optional vector embedding of the ingredient name */
-  embedding?: number[];
 
   /** Provenance / audit */
   createdAt: FirestoreTimestamp;
@@ -64,6 +88,7 @@ export interface RecipeIngredient {
   /** Unit enum; "free_text" hides unit and uses quantityText instead */
   unit: Unit;
 
+  // eslint-disable-next-line max-len
   /** Only used when unit === "free_text", e.g., "a pinch", "to taste", "1 large" */
   quantityText?: string;
 
@@ -97,10 +122,7 @@ export interface Recipe {
 
   name: string;
 
-  /**
-   * Keep within reasonable length for a single embedding with gemini-embedding-001.
-   * (Long, but not excessively large.)
-   */
+  /** Recipe description */
   description: string;
 
   /** Number of servings (viewer can scale UI; no auto conversions) */
@@ -118,14 +140,8 @@ export interface Recipe {
   /** Free-text categories, e.g., ["dessert", "norwegian"] */
   categories: string[];
 
-  /** Optional hero image for the recipe (viewer renders at fixed size) */
-  imageUrl?: string;
-
   /** Optional source attribution URL */
   sourceUrl?: string;
-
-  /** Optional vector embedding of (name + description) */
-  embedding?: number[];
 
   /** Provenance / audit */
   createdAt: FirestoreTimestamp;
@@ -144,7 +160,6 @@ export type RecipeCreate = Omit<
   Recipe,
   | "id"
   | "slug"
-  | "embedding"
   | "createdAt"
   | "updatedAt"
   | "createdByGroupId"
@@ -152,14 +167,12 @@ export type RecipeCreate = Omit<
   | "isArchived"
 > & {
   // allow omitting some fields at creation time
-  imageUrl?: string;
   tags?: string[];
   categories?: string[];
 };
 
 export type IngredientCreate = Omit<
   Ingredient,
-  | "embedding"
   | "createdAt"
   | "updatedAt"
   | "createdByGroupId"

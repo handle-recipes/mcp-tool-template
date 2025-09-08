@@ -106,7 +106,6 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `Tags: ${result.tags.join(", ") || "None"}\n` +
               `Categories: ${result.categories.join(", ") || "None"}\n` +
               `Source URL: ${result.sourceUrl || "None"}\n` +
-              `Image URL: ${result.imageUrl || "None"}\n\n` +
               `Ingredients:\n${ingredientsList}\n\n` +
               `Steps:\n${stepsList}\n\n` +
               `Updated: ${new Date(
