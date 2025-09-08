@@ -14,8 +14,6 @@ build
 
 # Environment files
 .env*
-.koyeb.env*
-.railway.env*
 
 # Git
 .git

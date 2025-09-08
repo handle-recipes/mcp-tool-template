@@ -1,15 +1,14 @@
 # mcp-tool-template
 
-Run locally to set up deployment:
+Run locally to set up:
 ```
-brew install koyeb/tap/koyeb
-npm run setup           # pastes token & picks group, writes .koyeb.env
+npm run setup           # sets up environment configuration
 
 ```
 
-Then deploy by running:
+Then run:
 ```
-npm run deploy
-# or deploy under a different group just this time:
-npm run deploy -- group-07
+npm run dev             # for development
+npm run build           # to build
+npm start               # to run built version
 ```
