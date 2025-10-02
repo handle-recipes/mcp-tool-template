@@ -26,6 +26,15 @@ import {
   // Search types
   SearchRecipesRequest,
   SearchRecipesResponse,
+  // Suggestion types
+  CreateSuggestionRequest,
+  CreateSuggestionResponse,
+  ListSuggestionsRequest,
+  ListSuggestionsResponse,
+  VoteSuggestionRequest,
+  VoteSuggestionResponse,
+  UpdateSuggestionRequest,
+  UpdateSuggestionResponse,
 } from "./apiTypes";
 
 export class FirebaseFunctionsAPI {
@@ -166,6 +175,58 @@ export class FirebaseFunctionsAPI {
     const response = await this.client.post("/recipesSearch", request, {
       headers: this.getHeaders(),
     });
+    return response.data;
+  }
+
+  // ----------------------
+  // Suggestion API methods
+  // ----------------------
+
+  async createSuggestion(
+    request: CreateSuggestionRequest
+  ): Promise<CreateSuggestionResponse> {
+    const response = await this.client.post("/suggestionsCreate", request, {
+      headers: this.getHeaders(),
+    });
+    return response.data;
+  }
+
+  async listSuggestions(
+    request?: ListSuggestionsRequest
+  ): Promise<ListSuggestionsResponse> {
+    const response = await this.client.post(
+      "/suggestionsList",
+      request || {},
+      {
+        headers: this.getHeaders(),
+      }
+    );
+    return response.data;
+  }
+
+  async voteSuggestion(id: string): Promise<VoteSuggestionResponse> {
+    const response = await this.client.post(
+      "/suggestionsVote",
+      { id },
+      {
+        headers: this.getHeaders(),
+      }
+    );
+    return response.data;
+  }
+
+  async updateSuggestion(
+    id: string,
+    request: UpdateSuggestionRequest
+  ): Promise<UpdateSuggestionResponse> {
+    const requestWithId = { ...request, id };
+    const response = await this.client.post(
+      "/suggestionsUpdate",
+      requestWithId,
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 }
