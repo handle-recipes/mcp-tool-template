@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import {
+  validateRecipeCreation,
+  validateIngredientCreation,
+  validateSuggestionCreation,
+} from "./lib/mcp-error-handler";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -230,6 +235,23 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Allergens present in this ingredient"),
     }),
     handler: async ({ name, aliases, categories, allergens }) => {
+      const validationError = validateIngredientCreation({
+        name,
+        aliases,
+        categories,
+        allergens,
+      });
+      if (validationError) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ Validation failed: ${validationError}`,
+            },
+          ],
+        };
+      }
+
       const result = await api.createIngredient({
         name,
         aliases,
@@ -241,7 +263,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           {
             type: "text" as const,
             text:
-              `Created ingredient: ${result.name}\n` +
+              `✅ Created ingredient: ${result.name}\n` +
               `ID: ${result.id}\n` +
               `Aliases: ${result.aliases.join(", ") || "None"}\n` +
               `Categories: ${result.categories.join(", ") || "None"}\n` +
@@ -387,6 +409,24 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
+      const validationError = validateRecipeCreation({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+      });
+      if (validationError) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ Validation failed: ${validationError}`,
+            },
+          ],
+        };
+      }
+
       const result = await api.createRecipe({
         name,
         description,
@@ -402,7 +442,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           {
             type: "text" as const,
             text:
-              `Created recipe: ${result.name}\n` +
+              `✅ Created recipe: ${result.name}\n` +
               `ID: ${result.id}\n` +
               `Slug: ${result.slug}\n` +
               `Servings: ${result.servings}\n` +
@@ -559,6 +599,18 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       priority,
       relatedRecipeId,
     }) => {
+      const validationError = validateSuggestionCreation({ title, description });
+      if (validationError) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ Validation failed: ${validationError}`,
+            },
+          ],
+        };
+      }
+
       const result = await api.createSuggestion({
         title,
         description,
@@ -571,7 +623,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           {
             type: "text" as const,
             text:
-              `Created suggestion: ${result.title}\n` +
+              `✅ Created suggestion: ${result.title}\n` +
               `ID: ${result.id}\n` +
               `Status: ${result.status}\n` +
               `Category: ${result.category || "None"}\n` +

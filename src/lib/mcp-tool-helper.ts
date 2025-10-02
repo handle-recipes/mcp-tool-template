@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { withErrorHandling } from "./mcp-error-handler";
 
 export interface MCPToolConfig<T extends z.ZodRawShape> {
   name: string;
@@ -16,7 +17,11 @@ export interface MCPToolConfig<T extends z.ZodRawShape> {
 export function createMCPTool<T extends z.ZodRawShape>(
   config: MCPToolConfig<T>
 ): MCPToolConfig<T> {
-  return config;
+  // Wrap the handler with error handling
+  return {
+    ...config,
+    handler: withErrorHandling(config.handler),
+  };
 }
 
 export function registerTools(
