@@ -538,4 +538,72 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       };
     },
   }),
+
+  createMCPTool({
+    name: "set_source_url_for_all_recipes",
+    description: "Set the source URL for all recipes",
+    schema: z.object({
+      sourceUrl: z.string().describe("Source URL to set for all recipes"),
+    }),
+    handler: async ({ sourceUrl }) => {
+      const result = await api.setSourceUrlForAllRecipes(sourceUrl);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Bulk operation completed:\n` +
+              `Updated: ${result.updated} recipes\n` +
+              `Failed: ${result.failed} recipes`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "set_tags_for_all_recipes",
+    description: "Set tags for all recipes (replaces existing tags)",
+    schema: z.object({
+      tags: z.array(z.string()).describe("Tags to set for all recipes"),
+    }),
+    handler: async ({ tags }) => {
+      const result = await api.setTagsForAllRecipes(tags);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Bulk operation completed:\n` +
+              `Updated: ${result.updated} recipes\n` +
+              `Failed: ${result.failed} recipes`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "set_categories_for_all_recipes",
+    description: "Set categories for all recipes (replaces existing categories)",
+    schema: z.object({
+      categories: z
+        .array(z.string())
+        .describe("Categories to set for all recipes"),
+    }),
+    handler: async ({ categories }) => {
+      const result = await api.setCategoriesForAllRecipes(categories);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Bulk operation completed:\n` +
+              `Updated: ${result.updated} recipes\n` +
+              `Failed: ${result.failed} recipes`,
+          },
+        ],
+      };
+    },
+  }),
 ];

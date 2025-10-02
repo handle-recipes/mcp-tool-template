@@ -297,4 +297,97 @@ export class FirebaseFunctionsAPI {
 
     return { updated, failed };
   }
+
+  async setSourceUrlForAllRecipes(
+    sourceUrl: string
+  ): Promise<{ updated: number; failed: number }> {
+    let updated = 0;
+    let failed = 0;
+    let offset = 0;
+    const limit = 50;
+
+    while (true) {
+      const result = await this.listRecipes({ limit, offset });
+
+      for (const recipe of result.recipes) {
+        try {
+          await this.updateRecipe(recipe.id, {
+            id: recipe.id,
+            sourceUrl,
+          });
+          updated++;
+        } catch (error) {
+          console.error(`Failed to update recipe ${recipe.id}:`, error);
+          failed++;
+        }
+      }
+
+      if (!result.hasMore) break;
+      offset += limit;
+    }
+
+    return { updated, failed };
+  }
+
+  async setTagsForAllRecipes(
+    tags: string[]
+  ): Promise<{ updated: number; failed: number }> {
+    let updated = 0;
+    let failed = 0;
+    let offset = 0;
+    const limit = 50;
+
+    while (true) {
+      const result = await this.listRecipes({ limit, offset });
+
+      for (const recipe of result.recipes) {
+        try {
+          await this.updateRecipe(recipe.id, {
+            id: recipe.id,
+            tags,
+          });
+          updated++;
+        } catch (error) {
+          console.error(`Failed to update recipe ${recipe.id}:`, error);
+          failed++;
+        }
+      }
+
+      if (!result.hasMore) break;
+      offset += limit;
+    }
+
+    return { updated, failed };
+  }
+
+  async setCategoriesForAllRecipes(
+    categories: string[]
+  ): Promise<{ updated: number; failed: number }> {
+    let updated = 0;
+    let failed = 0;
+    let offset = 0;
+    const limit = 50;
+
+    while (true) {
+      const result = await this.listRecipes({ limit, offset });
+
+      for (const recipe of result.recipes) {
+        try {
+          await this.updateRecipe(recipe.id, {
+            id: recipe.id,
+            categories,
+          });
+          updated++;
+        } catch (error) {
+          console.error(`Failed to update recipe ${recipe.id}:`, error);
+          failed++;
+        }
+      }
+
+      if (!result.hasMore) break;
+      offset += limit;
+    }
+
+    return { updated, failed };
+  }
 }
