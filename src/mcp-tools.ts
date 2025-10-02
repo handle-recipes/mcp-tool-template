@@ -319,56 +319,13 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   // ----------------------
 
   createMCPTool({
-    name: "create_recipe",
-    description: "Create a new recipe",
+    name: "create_recipe_basic",
+    description:
+      "Create a new recipe with basic information (no ingredients or steps yet). Use add_recipe_ingredient and add_recipe_step to populate the recipe.",
     schema: z.object({
       name: z.string().describe("Name of the recipe"),
       description: z.string().describe("Recipe description"),
       servings: z.number().describe("Number of servings"),
-      ingredients: z
-        .array(
-          z.object({
-            ingredientId: z.string().describe("ID of the ingredient"),
-            quantity: z.number().optional().describe("Quantity amount"),
-            unit: z
-              .enum([
-                "g",
-                "kg",
-                "ml",
-                "l",
-                "oz",
-                "lb",
-                "tsp",
-                "tbsp",
-                "fl oz",
-                "cup",
-                "pint",
-                "quart",
-                "gallon",
-                "piece",
-                "free_text",
-              ])
-              .describe("Unit of measurement"),
-            quantityText: z
-              .string()
-              .optional()
-              .describe("Free-form quantity text (for unit='free_text')"),
-            note: z.string().optional().describe("Additional notes"),
-          })
-        )
-        .describe("List of ingredients"),
-      steps: z
-        .array(
-          z.object({
-            text: z.string().describe("Step instruction text"),
-            imageUrl: z.string().optional().describe("Optional image URL"),
-            equipment: z
-              .array(z.string())
-              .optional()
-              .describe("Optional equipment list"),
-          })
-        )
-        .describe("Ordered list of recipe steps"),
       tags: z
         .array(z.string())
         .optional()
@@ -386,8 +343,6 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       name,
       description,
       servings,
-      ingredients,
-      steps,
       tags,
       categories,
       sourceUrl,
@@ -396,8 +351,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         name,
         description,
         servings,
-        ingredients,
-        steps,
+        ingredients: [],
+        steps: [],
         tags,
         categories,
         sourceUrl,
@@ -411,8 +366,115 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `ID: ${result.id}\n` +
               `Slug: ${result.slug}\n` +
               `Servings: ${result.servings}\n` +
-              `Ingredients: ${result.ingredients.length}\n` +
-              `Steps: ${result.steps.length}`,
+              `Tags: ${result.tags.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n\n` +
+              `Next: Use add_recipe_ingredient and add_recipe_step to populate this recipe.`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "add_recipe_ingredient",
+    description: "Add a single ingredient to an existing recipe",
+    schema: z.object({
+      recipeId: z.string().describe("ID of the recipe to add ingredient to"),
+      ingredientId: z.string().describe("ID of the ingredient"),
+      quantity: z.number().optional().describe("Quantity amount"),
+      unit: z
+        .enum([
+          "g",
+          "kg",
+          "ml",
+          "l",
+          "oz",
+          "lb",
+          "tsp",
+          "tbsp",
+          "fl oz",
+          "cup",
+          "pint",
+          "quart",
+          "gallon",
+          "piece",
+          "free_text",
+        ])
+        .describe("Unit of measurement"),
+      quantityText: z
+        .string()
+        .optional()
+        .describe("Free-form quantity text (for unit='free_text')"),
+      note: z.string().optional().describe("Additional notes (e.g., 'chopped')"),
+    }),
+    handler: async ({
+      recipeId,
+      ingredientId,
+      quantity,
+      unit,
+      quantityText,
+      note,
+    }) => {
+      // First get the current recipe
+      const recipe = await api.getRecipe(recipeId);
+
+      // Add the new ingredient
+      const updatedIngredients = [
+        ...recipe.ingredients,
+        { ingredientId, quantity, unit, quantityText, note },
+      ];
+
+      // Update the recipe
+      const result = await api.updateRecipe(recipeId, {
+        id: recipeId,
+        ingredients: updatedIngredients,
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Added ingredient to recipe: ${result.name}\n` +
+              `Total ingredients: ${result.ingredients.length}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "add_recipe_step",
+    description: "Add a single step to an existing recipe",
+    schema: z.object({
+      recipeId: z.string().describe("ID of the recipe to add step to"),
+      text: z.string().describe("Step instruction text"),
+      imageUrl: z.string().optional().describe("Optional image URL"),
+      equipment: z
+        .array(z.string())
+        .optional()
+        .describe("Optional equipment list (e.g., ['oven', 'mixing bowl'])"),
+    }),
+    handler: async ({ recipeId, text, imageUrl, equipment }) => {
+      // First get the current recipe
+      const recipe = await api.getRecipe(recipeId);
+
+      // Add the new step
+      const updatedSteps = [...recipe.steps, { text, imageUrl, equipment }];
+
+      // Update the recipe
+      const result = await api.updateRecipe(recipeId, {
+        id: recipeId,
+        steps: updatedSteps,
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Added step to recipe: ${result.name}\n` +
+              `Total steps: ${result.steps.length}`,
           },
         ],
       };
@@ -421,7 +483,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "update_recipe",
-    description: "Update an existing recipe",
+    description:
+      "Update an existing recipe (advanced). For adding individual ingredients/steps, use add_recipe_ingredient and add_recipe_step instead.",
     schema: z.object({
       id: z.string().describe("ID of the recipe to update"),
       name: z.string().optional().describe("Updated name"),
