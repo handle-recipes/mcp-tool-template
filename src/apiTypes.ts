@@ -1,12 +1,13 @@
 // api.ts
 // Type definitions for Recipe Functions API requests and responses
-// Import this file alongside types.ts for complete type coverage
+// Import this file alongside apiTypes.ts for complete type coverage
 
 import {
   Ingredient,
   Recipe,
   RecipeIngredient,
   RecipeStep,
+  Suggestion,
   GroupId,
 } from "./types";
 
@@ -156,6 +157,61 @@ export interface SearchRecipesResponse {
 }
 
 // ----------------------
+// Suggestion API Types
+// ----------------------
+
+export interface CreateSuggestionRequest {
+  title: string;
+  description: string;
+  category?: "feature" | "bug" | "improvement" | "other";
+  priority?: "low" | "medium" | "high";
+  relatedRecipeId?: string;
+}
+
+export interface CreateSuggestionResponse extends Suggestion {
+  id: string;
+}
+
+export interface ListSuggestionsRequest {
+  limit?: number;
+  offset?: number;
+  status?:
+    | "submitted"
+    | "under-review"
+    | "accepted"
+    | "rejected"
+    | "implemented";
+}
+
+export interface ListSuggestionsResponse {
+  suggestions: (Suggestion & { id: string })[];
+  hasMore: boolean;
+}
+
+export interface VoteSuggestionRequest {
+  id: string;
+}
+
+export interface VoteSuggestionResponse extends Suggestion {
+  id: string;
+  voted: boolean; // true if vote was added, false if removed
+}
+
+export interface UpdateSuggestionRequest {
+  id: string;
+  status:
+    | "submitted"
+    | "under-review"
+    | "accepted"
+    | "rejected"
+    | "implemented";
+}
+
+export interface UpdateSuggestionResponse extends Suggestion {
+  id: string;
+}
+
+// ----------------------
 // API Client Types
 // ----------------------
 
@@ -245,6 +301,32 @@ export interface ApiEndpoints {
     path: "/recipesSearch";
     request: SearchRecipesRequest;
     response: SearchRecipesResponse;
+  };
+
+  // Suggestions
+  suggestionsCreate: {
+    method: "POST";
+    path: "/suggestionsCreate";
+    request: CreateSuggestionRequest;
+    response: CreateSuggestionResponse;
+  };
+  suggestionsList: {
+    method: "POST";
+    path: "/suggestionsList";
+    request?: ListSuggestionsRequest;
+    response: ListSuggestionsResponse;
+  };
+  suggestionsVote: {
+    method: "POST";
+    path: "/suggestionsVote";
+    request: VoteSuggestionRequest;
+    response: VoteSuggestionResponse;
+  };
+  suggestionsUpdate: {
+    method: "POST";
+    path: "/suggestionsUpdate";
+    request: UpdateSuggestionRequest;
+    response: UpdateSuggestionResponse;
   };
 }
 
