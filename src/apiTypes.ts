@@ -45,6 +45,10 @@ export interface UpdateIngredientRequest {
   aliases?: string[];
   categories?: string[];
   allergens?: string[];
+  price?: number | null;
+  priceUnit?: string | null;
+  priceSource?: string | null;
+  priceUpdatedAt?: string | null;
 }
 
 export interface UpdateIngredientResponse extends Ingredient {

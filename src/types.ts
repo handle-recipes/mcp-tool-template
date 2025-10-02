@@ -61,6 +61,12 @@ export interface Ingredient {
   /** Allergen tags (e.g., "nuts", "gluten", "milk") */
   allergens: string[];
 
+  /** Price information */
+  price?: number | null;
+  priceUnit?: Unit | null;
+  priceSource?: string | null;
+  priceUpdatedAt?: string | null;
+
   /** Provenance / audit */
   createdAt: string;
   updatedAt: string;

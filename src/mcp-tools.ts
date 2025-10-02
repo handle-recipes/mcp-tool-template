@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import {
+  areUnitsCompatible,
+  convertPricePerUnit,
+  roundToPrecision,
+} from "./lib/unit-converter";
+import { Unit } from "./types";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -145,6 +151,126 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Found ${result.recipes.length} recipes:\n\n${recipesList}\n\n` +
               `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "list_recipes_by_cost",
+    description:
+      "List recipes sorted by cost per serving (lowest to highest). Only includes recipes where all ingredients have price information.",
+    schema: z.object({
+      limit: z
+        .number()
+        .optional()
+        .describe("Number of recipes to return (default: 20)"),
+      offset: z
+        .number()
+        .optional()
+        .describe("Number of recipes to skip for pagination (default: 0)"),
+    }),
+    handler: async ({ limit, offset }) => {
+      // Get all recipes
+      const result = await api.listRecipes({ limit: 1000 }); // Get a large batch to sort
+
+      // Calculate cost for each recipe
+      const recipesWithCost: Array<{
+        id: string;
+        name: string;
+        servings: number;
+        totalCost: number;
+        costPerServing: number;
+        hasAllPrices: boolean;
+      }> = [];
+
+      for (const recipe of result.recipes) {
+        let totalCost = 0;
+        let hasAllPrices = true;
+
+        // Get full recipe details
+        const fullRecipe = await api.getRecipe(recipe.id);
+
+        // Calculate cost for each ingredient
+        for (const recipeIngredient of fullRecipe.ingredients) {
+          try {
+            const ingredient = await api.getIngredient(
+              recipeIngredient.ingredientId
+            );
+
+            // Check if we can calculate cost
+            if (
+              ingredient.price &&
+              ingredient.priceUnit &&
+              recipeIngredient.quantity &&
+              recipeIngredient.unit !== "free_text"
+            ) {
+              if (
+                areUnitsCompatible(
+                  ingredient.priceUnit as Unit,
+                  recipeIngredient.unit
+                )
+              ) {
+                const pricePerRecipeUnit = convertPricePerUnit(
+                  ingredient.price,
+                  ingredient.priceUnit as Unit,
+                  recipeIngredient.unit
+                );
+                totalCost += pricePerRecipeUnit * recipeIngredient.quantity;
+              } else {
+                hasAllPrices = false;
+                break;
+              }
+            } else {
+              hasAllPrices = false;
+              break;
+            }
+          } catch {
+            hasAllPrices = false;
+            break;
+          }
+        }
+
+        // Only include recipes with complete pricing
+        if (hasAllPrices && fullRecipe.ingredients.length > 0) {
+          const costPerServing =
+            fullRecipe.servings > 0 ? totalCost / fullRecipe.servings : 0;
+          recipesWithCost.push({
+            id: fullRecipe.id,
+            name: fullRecipe.name,
+            servings: fullRecipe.servings,
+            totalCost: roundToPrecision(totalCost, 2),
+            costPerServing: roundToPrecision(costPerServing, 2),
+            hasAllPrices,
+          });
+        }
+      }
+
+      // Sort by cost per serving
+      recipesWithCost.sort((a, b) => a.costPerServing - b.costPerServing);
+
+      // Apply pagination
+      const startIndex = offset || 0;
+      const endIndex = startIndex + (limit || 20);
+      const paginatedRecipes = recipesWithCost.slice(startIndex, endIndex);
+
+      // Format output
+      const recipesList = paginatedRecipes
+        .map(
+          (recipe) =>
+            `- ${recipe.name} (${recipe.id})\n` +
+            `  Cost per serving: ${recipe.costPerServing} | Total cost: ${recipe.totalCost} | Servings: ${recipe.servings}`
+        )
+        .join("\n\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${recipesWithCost.length} recipes with complete pricing:\n\n${recipesList}\n\n` +
+              `Showing ${paginatedRecipes.length} of ${recipesWithCost.length} recipes`,
           },
         ],
       };
@@ -308,6 +434,60 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           {
             type: "text" as const,
             text: result.message,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "update_ingredient_price",
+    description:
+      "Update the price information for an ingredient. The price should be per the specified unit (e.g., price per kg, per lb, per piece).",
+    schema: z.object({
+      id: z.string().describe("ID of the ingredient to update"),
+      price: z.number().describe("Price per unit"),
+      priceUnit: z
+        .enum([
+          "g",
+          "kg",
+          "ml",
+          "l",
+          "oz",
+          "lb",
+          "tsp",
+          "tbsp",
+          "fl oz",
+          "cup",
+          "pint",
+          "quart",
+          "gallon",
+          "piece",
+        ])
+        .describe("Unit for the price (e.g., kg, lb, piece)"),
+      priceSource: z
+        .string()
+        .optional()
+        .describe("Optional source of the price (e.g., store name, website)"),
+    }),
+    handler: async ({ id, price, priceUnit, priceSource }) => {
+      const priceUpdatedAt = new Date().toISOString();
+      const result = await api.updateIngredient(id, {
+        id,
+        price,
+        priceUnit,
+        priceSource,
+        priceUpdatedAt,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated price for: ${result.name}\n` +
+              `Price: ${result.price} per ${result.priceUnit}\n` +
+              `Source: ${result.priceSource || "Not specified"}\n` +
+              `Updated at: ${result.priceUpdatedAt}`,
           },
         ],
       };
@@ -592,6 +772,129 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           {
             type: "text" as const,
             text: result.message,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "calculate_recipe_cost",
+    description:
+      "Calculate the total cost and cost per serving for a recipe based on ingredient prices. Handles unit conversions automatically.",
+    schema: z.object({
+      recipeId: z.string().describe("ID of the recipe to calculate cost for"),
+    }),
+    handler: async ({ recipeId }) => {
+      // Get the recipe
+      const recipe = await api.getRecipe(recipeId);
+
+      // Track results
+      let totalCost = 0;
+      const ingredientCosts: Array<{
+        name: string;
+        quantity: number | string;
+        unit: Unit;
+        cost: number | null;
+        note: string;
+      }> = [];
+      const missingPrices: string[] = [];
+
+      // Calculate cost for each ingredient
+      for (const recipeIngredient of recipe.ingredients) {
+        const ingredient = await api.getIngredient(
+          recipeIngredient.ingredientId
+        );
+
+        // Determine display quantity
+        const displayQuantity =
+          recipeIngredient.unit === "free_text"
+            ? recipeIngredient.quantityText || "N/A"
+            : recipeIngredient.quantity || 0;
+
+        let cost: number | null = null;
+        let note = "";
+
+        // Check if ingredient has price information
+        if (
+          ingredient.price &&
+          ingredient.priceUnit &&
+          recipeIngredient.quantity &&
+          recipeIngredient.unit !== "free_text"
+        ) {
+          try {
+            // Check if units are compatible
+            if (
+              areUnitsCompatible(
+                ingredient.priceUnit as Unit,
+                recipeIngredient.unit
+              )
+            ) {
+              // Convert price to recipe unit
+              const pricePerRecipeUnit = convertPricePerUnit(
+                ingredient.price,
+                ingredient.priceUnit as Unit,
+                recipeIngredient.unit
+              );
+
+              // Calculate cost for this ingredient
+              cost = pricePerRecipeUnit * recipeIngredient.quantity;
+              totalCost += cost;
+              note = `${ingredient.price} per ${ingredient.priceUnit}`;
+            } else {
+              note = `Cannot convert ${ingredient.priceUnit} to ${recipeIngredient.unit}`;
+              missingPrices.push(
+                `${ingredient.name} (incompatible units: ${ingredient.priceUnit} vs ${recipeIngredient.unit})`
+              );
+            }
+          } catch (error) {
+            note = `Conversion error: ${error instanceof Error ? error.message : "Unknown error"}`;
+            missingPrices.push(`${ingredient.name} (${note})`);
+          }
+        } else if (recipeIngredient.unit === "free_text") {
+          note = "Free text quantity - cannot calculate";
+          missingPrices.push(`${ingredient.name} (free text quantity)`);
+        } else {
+          note = "No price information available";
+          missingPrices.push(ingredient.name);
+        }
+
+        ingredientCosts.push({
+          name: ingredient.name,
+          quantity: displayQuantity,
+          unit: recipeIngredient.unit,
+          cost: cost ? roundToPrecision(cost, 2) : null,
+          note,
+        });
+      }
+
+      // Calculate cost per serving
+      const costPerServing =
+        recipe.servings > 0 ? totalCost / recipe.servings : 0;
+
+      // Format the breakdown
+      const breakdownText = ingredientCosts
+        .map((item) => {
+          const costText = item.cost !== null ? `${item.cost}` : "N/A";
+          return `- ${item.name}: ${item.quantity} ${item.unit} = ${costText} (${item.note})`;
+        })
+        .join("\n");
+
+      const missingText =
+        missingPrices.length > 0
+          ? `\n\nMissing or incompatible prices:\n${missingPrices.map((name) => `- ${name}`).join("\n")}`
+          : "";
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Recipe: ${recipe.name}\n` +
+              `Servings: ${recipe.servings}\n\n` +
+              `Total Cost: ${roundToPrecision(totalCost, 2)}\n` +
+              `Cost per Serving: ${roundToPrecision(costPerServing, 2)}\n\n` +
+              `Ingredient Breakdown:\n${breakdownText}${missingText}`,
           },
         ],
       };
