@@ -13,9 +13,10 @@ interface ValidationError {
   example?: string;
 }
 
-function validateRecipeIngredients(
-  ingredients: any[]
-): { valid: boolean; errors: ValidationError[] } {
+function validateRecipeIngredients(ingredients: any[]): {
+  valid: boolean;
+  errors: ValidationError[];
+} {
   const errors: ValidationError[] = [];
 
   if (!Array.isArray(ingredients)) {
@@ -52,13 +53,17 @@ function validateRecipeIngredients(
     if (!ing.unit) {
       errors.push({
         field: `ingredients[${idx}].unit`,
-        message: `Missing unit at index ${idx}. Must be one of: ${UNITS.join(", ")}`,
+        message: `Missing unit at index ${idx}. Must be one of: ${UNITS.join(
+          ", "
+        )}`,
         example: '"unit": "g" or "unit": "piece" or "unit": "free_text"',
       });
     } else if (!UNITS.includes(ing.unit as Unit)) {
       errors.push({
         field: `ingredients[${idx}].unit`,
-        message: `Invalid unit "${ing.unit}" at index ${idx}. Must be one of: ${UNITS.join(", ")}`,
+        message: `Invalid unit "${
+          ing.unit
+        }" at index ${idx}. Must be one of: ${UNITS.join(", ")}`,
         example: '"unit": "g"',
       });
     }
@@ -95,9 +100,10 @@ function validateRecipeIngredients(
   return { valid: errors.length === 0, errors };
 }
 
-function validateRecipeSteps(
-  steps: any[]
-): { valid: boolean; errors: ValidationError[] } {
+function validateRecipeSteps(steps: any[]): {
+  valid: boolean;
+  errors: ValidationError[];
+} {
   const errors: ValidationError[] = [];
 
   if (!Array.isArray(steps)) {
@@ -405,10 +411,9 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           (suggestion) =>
             `- ${suggestion.title} (${suggestion.id})\n` +
             `  Status: ${suggestion.status} | Category: ${suggestion.category} | Priority: ${suggestion.priority}\n` +
-            `  Votes: ${suggestion.votes} | Description: ${suggestion.description.substring(
-              0,
-              80
-            )}...`
+            `  Votes: ${
+              suggestion.votes
+            } | Description: ${suggestion.description.substring(0, 80)}...`
         )
         .join("\n\n");
 
@@ -476,15 +481,15 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     description: "Update an existing ingredient",
     schema: z.object({
       id: z.string().describe("The ID of the ingredient to update"),
-      name: z.string().optional().describe("The updated name of the ingredient"),
+      name: z
+        .string()
+        .optional()
+        .describe("The updated name of the ingredient"),
       aliases: z
         .array(z.string())
         .optional()
         .describe("Updated alternate names or spellings"),
-      categories: z
-        .array(z.string())
-        .optional()
-        .describe("Updated categories"),
+      categories: z.array(z.string()).optional().describe("Updated categories"),
       allergens: z
         .array(z.string())
         .optional()
@@ -576,7 +581,10 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               .string()
               .optional()
               .describe('Free-form text when unit is "free_text"'),
-            note: z.string().optional().describe("Additional note (e.g., chopped)"),
+            note: z
+              .string()
+              .optional()
+              .describe("Additional note (e.g., chopped)"),
           })
         )
         .describe("List of ingredients for the recipe"),
@@ -600,7 +608,10 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .array(z.string())
         .optional()
         .describe("Categories (e.g., dessert, norwegian)"),
-      sourceUrl: z.string().optional().describe("Optional source attribution URL"),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe("Optional source attribution URL"),
     }),
     handler: async ({
       name,
@@ -815,7 +826,10 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               .string()
               .optional()
               .describe('Free-form text when unit is "free_text"'),
-            note: z.string().optional().describe("Additional note (e.g., chopped)"),
+            note: z
+              .string()
+              .optional()
+              .describe("Additional note (e.g., chopped)"),
           })
         )
         .optional()
@@ -833,14 +847,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         )
         .optional()
         .describe("Updated list of recipe steps"),
-      tags: z
-        .array(z.string())
-        .optional()
-        .describe("Updated tags"),
-      categories: z
-        .array(z.string())
-        .optional()
-        .describe("Updated categories"),
+      tags: z.array(z.string()).optional().describe("Updated tags"),
+      categories: z.array(z.string()).optional().describe("Updated categories"),
       sourceUrl: z.string().optional().describe("Updated source URL"),
     }),
     handler: async ({
@@ -934,7 +942,10 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     }) => {
       const errors: ValidationError[] = [];
 
-      if (servings !== undefined && (servings <= 0 || !Number.isInteger(servings))) {
+      if (
+        servings !== undefined &&
+        (servings <= 0 || !Number.isInteger(servings))
+      ) {
         errors.push({
           field: "servings",
           message: "servings must be a positive integer",
@@ -981,7 +992,9 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           content: [
             {
               type: "text" as const,
-              text: `Failed to update recipe metadata. API error:\n\n${error.message || JSON.stringify(error)}`,
+              text: `Failed to update recipe metadata. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
             },
           ],
         };
@@ -1026,7 +1039,10 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               .string()
               .optional()
               .describe('Free-form text when unit is "free_text"'),
-            note: z.string().optional().describe("Additional note (e.g., chopped)"),
+            note: z
+              .string()
+              .optional()
+              .describe("Additional note (e.g., chopped)"),
           })
         )
         .describe("Complete list of ingredients (replaces existing)"),
@@ -1057,7 +1073,14 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
                 `Successfully updated recipe ingredients!\n` +
                 `Recipe: ${result.name}\n` +
                 `Ingredients count: ${result.ingredients.length}\n\n` +
-                `Ingredients:\n${result.ingredients.map((ing, idx) => `${idx + 1}. ${ing.quantity || ""} ${ing.unit === "free_text" ? ing.quantityText : ing.unit} - Ingredient ID: ${ing.ingredientId}`).join("\n")}`,
+                `Ingredients:\n${result.ingredients
+                  .map(
+                    (ing, idx) =>
+                      `${idx + 1}. ${ing.quantity || ""} ${
+                        ing.unit === "free_text" ? ing.quantityText : ing.unit
+                      } - Ingredient ID: ${ing.ingredientId}`
+                  )
+                  .join("\n")}`,
             },
           ],
         };
@@ -1067,7 +1090,9 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             {
               type: "text" as const,
               text:
-                `Failed to update recipe ingredients. API error:\n\n${error.message || JSON.stringify(error)}\n\n` +
+                `Failed to update recipe ingredients. API error:\n\n${
+                  error.message || JSON.stringify(error)
+                }\n\n` +
                 `Please ensure all ingredient IDs exist in the system.`,
             },
           ],
@@ -1121,7 +1146,12 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
                 `Successfully updated recipe steps!\n` +
                 `Recipe: ${result.name}\n` +
                 `Steps count: ${result.steps.length}\n\n` +
-                `Steps:\n${result.steps.map((step, idx) => `${idx + 1}. ${step.text.substring(0, 60)}...`).join("\n")}`,
+                `Steps:\n${result.steps
+                  .map(
+                    (step, idx) =>
+                      `${idx + 1}. ${step.text.substring(0, 60)}...`
+                  )
+                  .join("\n")}`,
             },
           ],
         };
@@ -1130,7 +1160,658 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           content: [
             {
               type: "text" as const,
-              text: `Failed to update recipe steps. API error:\n\n${error.message || JSON.stringify(error)}`,
+              text: `Failed to update recipe steps. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  // ----------------------
+  // Granular ingredient operations
+  // ----------------------
+
+  createMCPTool({
+    name: "add_ingredient_to_recipe",
+    description:
+      "Add a single ingredient to an existing recipe. The ingredient is appended to the end of the ingredients list.",
+    schema: z.object({
+      recipeId: z
+        .string()
+        .describe("The ID of the recipe to add the ingredient to"),
+      ingredientId: z.string().describe("ID of the ingredient to add"),
+      quantity: z
+        .number()
+        .optional()
+        .describe("Quantity (omit if using free_text unit)"),
+      unit: z.enum(UNITS).describe("Unit of measurement"),
+      quantityText: z
+        .string()
+        .optional()
+        .describe('Free-form text when unit is "free_text"'),
+      note: z.string().optional().describe("Additional note (e.g., chopped)"),
+    }),
+    handler: async ({
+      recipeId,
+      ingredientId,
+      quantity,
+      unit,
+      quantityText,
+      note,
+    }) => {
+      // Validate the new ingredient
+      const validation = validateRecipeIngredients([
+        { ingredientId, quantity, unit, quantityText, note },
+      ]);
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(validation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        // Add new ingredient to the list
+        const updatedIngredients = [
+          ...currentRecipe.ingredients,
+          {
+            ingredientId,
+            quantity,
+            unit,
+            quantityText,
+            note,
+          } as RecipeIngredient,
+        ];
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          ingredients: updatedIngredients,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully added ingredient to recipe!\n` +
+                `Recipe: ${result.name}\n` +
+                `Added ingredient ID: ${ingredientId}\n` +
+                `Total ingredients: ${result.ingredients.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Failed to add ingredient. API error:\n\n${
+                  error.message || JSON.stringify(error)
+                }\n\n` +
+                `Please ensure the recipe ID and ingredient ID exist in the system.`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "replace_ingredient_in_recipe",
+    description:
+      "Replace a specific ingredient in a recipe by its position/index (0-based). Use this to update the quantity, unit, or switch to a different ingredient.",
+    schema: z.object({
+      recipeId: z.string().describe("The ID of the recipe"),
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .describe("The 0-based index of the ingredient to replace"),
+      ingredientId: z.string().describe("New ingredient ID"),
+      quantity: z
+        .number()
+        .optional()
+        .describe("New quantity (omit if using free_text unit)"),
+      unit: z
+        .enum([
+          "g",
+          "kg",
+          "ml",
+          "l",
+          "oz",
+          "lb",
+          "tsp",
+          "tbsp",
+          "fl oz",
+          "cup",
+          "pint",
+          "quart",
+          "gallon",
+          "piece",
+          "free_text",
+        ])
+        .describe("New unit of measurement"),
+      quantityText: z
+        .string()
+        .optional()
+        .describe('Free-form text when unit is "free_text"'),
+      note: z.string().optional().describe("New additional note"),
+    }),
+    handler: async ({
+      recipeId,
+      index,
+      ingredientId,
+      quantity,
+      unit,
+      quantityText,
+      note,
+    }) => {
+      // Validate the new ingredient
+      const validation = validateRecipeIngredients([
+        { ingredientId, quantity, unit, quantityText, note },
+      ]);
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(validation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        if (index < 0 || index >= currentRecipe.ingredients.length) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `Invalid index. Recipe has ${
+                    currentRecipe.ingredients.length
+                  } ingredients (indices 0-${
+                    currentRecipe.ingredients.length - 1
+                  }).\n` + `You provided index: ${index}`,
+              },
+            ],
+          };
+        }
+
+        // Replace ingredient at index
+        const updatedIngredients = [...currentRecipe.ingredients];
+        updatedIngredients[index] = {
+          ingredientId,
+          quantity,
+          unit,
+          quantityText,
+          note,
+        } as RecipeIngredient;
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          ingredients: updatedIngredients,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully replaced ingredient at index ${index}!\n` +
+                `Recipe: ${result.name}\n` +
+                `New ingredient ID: ${ingredientId}\n` +
+                `Total ingredients: ${result.ingredients.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Failed to replace ingredient. API error:\n\n${
+                  error.message || JSON.stringify(error)
+                }\n\n` +
+                `Please ensure the recipe ID and ingredient ID exist in the system.`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "remove_ingredient_from_recipe",
+    description:
+      "Remove a specific ingredient from a recipe by its position/index (0-based).",
+    schema: z.object({
+      recipeId: z.string().describe("The ID of the recipe"),
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .describe("The 0-based index of the ingredient to remove"),
+    }),
+    handler: async ({ recipeId, index }) => {
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        if (index < 0 || index >= currentRecipe.ingredients.length) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `Invalid index. Recipe has ${
+                    currentRecipe.ingredients.length
+                  } ingredients (indices 0-${
+                    currentRecipe.ingredients.length - 1
+                  }).\n` + `You provided index: ${index}`,
+              },
+            ],
+          };
+        }
+
+        if (currentRecipe.ingredients.length === 1) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Cannot remove the last ingredient. A recipe must have at least one ingredient.`,
+              },
+            ],
+          };
+        }
+
+        // Remove ingredient at index
+        const removedIngredient = currentRecipe.ingredients[index];
+        const updatedIngredients = currentRecipe.ingredients.filter(
+          (_, i) => i !== index
+        );
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          ingredients: updatedIngredients,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully removed ingredient at index ${index}!\n` +
+                `Recipe: ${result.name}\n` +
+                `Removed ingredient ID: ${removedIngredient.ingredientId}\n` +
+                `Remaining ingredients: ${result.ingredients.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to remove ingredient. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  // ----------------------
+  // Granular step operations
+  // ----------------------
+
+  createMCPTool({
+    name: "add_step_to_recipe",
+    description:
+      "Add a single step to an existing recipe. The step is appended to the end of the steps list.",
+    schema: z.object({
+      recipeId: z.string().describe("The ID of the recipe to add the step to"),
+      text: z.string().describe("The instruction text for the new step"),
+      imageUrl: z
+        .string()
+        .optional()
+        .describe("Optional image URL for the step"),
+      equipment: z
+        .array(z.string())
+        .optional()
+        .describe("Optional equipment needed for this step"),
+    }),
+    handler: async ({ recipeId, text, imageUrl, equipment }) => {
+      // Validate the new step
+      const validation = validateRecipeSteps([{ text, imageUrl, equipment }]);
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(validation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        // Add new step to the list
+        const updatedSteps = [
+          ...currentRecipe.steps,
+          { text, imageUrl, equipment } as RecipeStep,
+        ];
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          steps: updatedSteps,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully added step to recipe!\n` +
+                `Recipe: ${result.name}\n` +
+                `New step: ${text.substring(0, 60)}...\n` +
+                `Total steps: ${result.steps.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to add step. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "replace_step_in_recipe",
+    description:
+      "Replace a specific step in a recipe by its position/index (0-based). Use this to update the instruction text, image, or equipment.",
+    schema: z.object({
+      recipeId: z.string().describe("The ID of the recipe"),
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .describe("The 0-based index of the step to replace"),
+      text: z.string().describe("New instruction text for the step"),
+      imageUrl: z.string().optional().describe("New optional image URL"),
+      equipment: z
+        .array(z.string())
+        .optional()
+        .describe("New optional equipment list"),
+    }),
+    handler: async ({ recipeId, index, text, imageUrl, equipment }) => {
+      // Validate the new step
+      const validation = validateRecipeSteps([{ text, imageUrl, equipment }]);
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(validation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        if (index < 0 || index >= currentRecipe.steps.length) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `Invalid index. Recipe has ${
+                    currentRecipe.steps.length
+                  } steps (indices 0-${currentRecipe.steps.length - 1}).\n` +
+                  `You provided index: ${index}`,
+              },
+            ],
+          };
+        }
+
+        // Replace step at index
+        const updatedSteps = [...currentRecipe.steps];
+        updatedSteps[index] = { text, imageUrl, equipment } as RecipeStep;
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          steps: updatedSteps,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully replaced step at index ${index}!\n` +
+                `Recipe: ${result.name}\n` +
+                `New step text: ${text.substring(0, 60)}...\n` +
+                `Total steps: ${result.steps.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to replace step. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "remove_step_from_recipe",
+    description:
+      "Remove a specific step from a recipe by its position/index (0-based).",
+    schema: z.object({
+      recipeId: z.string().describe("The ID of the recipe"),
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .describe("The 0-based index of the step to remove"),
+    }),
+    handler: async ({ recipeId, index }) => {
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        if (index < 0 || index >= currentRecipe.steps.length) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `Invalid index. Recipe has ${
+                    currentRecipe.steps.length
+                  } steps (indices 0-${currentRecipe.steps.length - 1}).\n` +
+                  `You provided index: ${index}`,
+              },
+            ],
+          };
+        }
+
+        if (currentRecipe.steps.length === 1) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Cannot remove the last step. A recipe must have at least one step.`,
+              },
+            ],
+          };
+        }
+
+        // Remove step at index
+        const removedStep = currentRecipe.steps[index];
+        const updatedSteps = currentRecipe.steps.filter((_, i) => i !== index);
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          steps: updatedSteps,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully removed step at index ${index}!\n` +
+                `Recipe: ${result.name}\n` +
+                `Removed step: ${removedStep.text.substring(0, 60)}...\n` +
+                `Remaining steps: ${result.steps.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to remove step. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "insert_step_in_recipe",
+    description:
+      "Insert a step at a specific position in a recipe. Existing steps at or after this position will be shifted down.",
+    schema: z.object({
+      recipeId: z.string().describe("The ID of the recipe"),
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .describe("The 0-based index where the step should be inserted"),
+      text: z.string().describe("The instruction text for the new step"),
+      imageUrl: z
+        .string()
+        .optional()
+        .describe("Optional image URL for the step"),
+      equipment: z
+        .array(z.string())
+        .optional()
+        .describe("Optional equipment needed for this step"),
+    }),
+    handler: async ({ recipeId, index, text, imageUrl, equipment }) => {
+      // Validate the new step
+      const validation = validateRecipeSteps([{ text, imageUrl, equipment }]);
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(validation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        // Get current recipe
+        const currentRecipe = await api.getRecipe(recipeId);
+
+        if (index < 0 || index > currentRecipe.steps.length) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  `Invalid index. Recipe has ${currentRecipe.steps.length} steps. You can insert at indices 0-${currentRecipe.steps.length} (inclusive).\n` +
+                  `You provided index: ${index}`,
+              },
+            ],
+          };
+        }
+
+        // Insert step at index
+        const updatedSteps = [...currentRecipe.steps];
+        updatedSteps.splice(index, 0, {
+          text,
+          imageUrl,
+          equipment,
+        } as RecipeStep);
+
+        // Update recipe
+        const result = await api.updateRecipe(recipeId, {
+          id: recipeId,
+          steps: updatedSteps,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully inserted step at index ${index}!\n` +
+                `Recipe: ${result.name}\n` +
+                `New step: ${text.substring(0, 60)}...\n` +
+                `Total steps: ${result.steps.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to insert step. API error:\n\n${
+                error.message || JSON.stringify(error)
+              }`,
             },
           ],
         };
@@ -1147,7 +1828,9 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     description: "Create a new suggestion for a feature, bug, or improvement",
     schema: z.object({
       title: z.string().describe("Brief title of the suggestion"),
-      description: z.string().describe("Detailed description of the suggestion"),
+      description: z
+        .string()
+        .describe("Detailed description of the suggestion"),
       category: z
         .enum(["feature", "bug", "improvement", "other"])
         .optional()
