@@ -3,6 +3,106 @@ import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
+  // ----------------------
+  // Ingredient Tools
+  // ----------------------
+  createMCPTool({
+    name: "create_ingredient",
+    description: "Create a new ingredient",
+    schema: z.object({
+      name: z.string().describe("Name of the ingredient"),
+      aliases: z
+        .array(z.string())
+        .optional()
+        .describe("Alternative names for the ingredient"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Categories this ingredient belongs to"),
+      allergens: z
+        .array(z.string())
+        .optional()
+        .describe("Allergens present in this ingredient"),
+    }),
+    handler: async ({ name, aliases, categories, allergens }) => {
+      const result = await api.createIngredient({
+        name,
+        aliases,
+        categories,
+        allergens,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "update_ingredient",
+    description: "Update an existing ingredient",
+    schema: z.object({
+      id: z.string().describe("The ID of the ingredient to update"),
+      name: z.string().optional().describe("New name for the ingredient"),
+      aliases: z
+        .array(z.string())
+        .optional()
+        .describe("New alternative names"),
+      categories: z.array(z.string()).optional().describe("New categories"),
+      allergens: z.array(z.string()).optional().describe("New allergens"),
+    }),
+    handler: async ({ id, name, aliases, categories, allergens }) => {
+      const result = await api.updateIngredient(id, {
+        id,
+        name,
+        aliases,
+        categories,
+        allergens,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "delete_ingredient",
+    description: "Delete an ingredient by ID",
+    schema: z.object({
+      id: z.string().describe("The ID of the ingredient to delete"),
+    }),
+    handler: async ({ id }) => {
+      const result = await api.deleteIngredient(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.message,
+          },
+        ],
+      };
+    },
+  }),
+
   createMCPTool({
     name: "get_ingredient",
     description: "Get a single ingredient by ID",
@@ -59,6 +159,200 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Found ${result.ingredients.length} ingredients:\n\n${ingredientsList}\n\n` +
               `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  // ----------------------
+  // Recipe Tools
+  // ----------------------
+  createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe",
+    schema: z.object({
+      name: z.string().describe("Name of the recipe"),
+      description: z.string().describe("Description of the recipe"),
+      servings: z.number().describe("Number of servings"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string(),
+            quantity: z.number().optional(),
+            unit: z.enum([
+              "g",
+              "kg",
+              "ml",
+              "l",
+              "oz",
+              "lb",
+              "tsp",
+              "tbsp",
+              "fl oz",
+              "cup",
+              "pint",
+              "quart",
+              "gallon",
+              "piece",
+              "free_text",
+            ]),
+            quantityText: z.string().optional(),
+            note: z.string().optional(),
+          })
+        )
+        .describe("List of ingredients with quantities"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string(),
+            imageUrl: z.string().optional(),
+            equipment: z.array(z.string()).optional(),
+          })
+        )
+        .describe("Cooking steps"),
+      tags: z.array(z.string()).optional().describe("Recipe tags"),
+      categories: z.array(z.string()).optional().describe("Recipe categories"),
+      sourceUrl: z.string().optional().describe("Source URL if applicable"),
+    }),
+    handler: async ({
+      name,
+      description,
+      servings,
+      ingredients,
+      steps,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const result = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created recipe: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Slug: ${result.slug}\n` +
+              `Servings: ${result.servings}\n` +
+              `Ingredients: ${result.ingredients.length}\n` +
+              `Steps: ${result.steps.length}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "update_recipe",
+    description: "Update an existing recipe",
+    schema: z.object({
+      id: z.string().describe("The ID of the recipe to update"),
+      name: z.string().optional().describe("New name for the recipe"),
+      description: z.string().optional().describe("New description"),
+      servings: z.number().optional().describe("New number of servings"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string(),
+            quantity: z.number().optional(),
+            unit: z.enum([
+              "g",
+              "kg",
+              "ml",
+              "l",
+              "oz",
+              "lb",
+              "tsp",
+              "tbsp",
+              "fl oz",
+              "cup",
+              "pint",
+              "quart",
+              "gallon",
+              "piece",
+              "free_text",
+            ]),
+            quantityText: z.string().optional(),
+            note: z.string().optional(),
+          })
+        )
+        .optional()
+        .describe("Updated list of ingredients"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string(),
+            imageUrl: z.string().optional(),
+            equipment: z.array(z.string()).optional(),
+          })
+        )
+        .optional()
+        .describe("Updated cooking steps"),
+      tags: z.array(z.string()).optional().describe("Updated tags"),
+      categories: z.array(z.string()).optional().describe("Updated categories"),
+      sourceUrl: z.string().optional().describe("Updated source URL"),
+    }),
+    handler: async ({
+      id,
+      name,
+      description,
+      servings,
+      ingredients,
+      steps,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const result = await api.updateRecipe(id, {
+        id,
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated recipe: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Slug: ${result.slug}\n` +
+              `Servings: ${result.servings}\n` +
+              `Updated: ${result.updatedAt}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "delete_recipe",
+    description: "Delete a recipe by ID",
+    schema: z.object({
+      id: z.string().describe("The ID of the recipe to delete"),
+    }),
+    handler: async ({ id }) => {
+      const result = await api.deleteRecipe(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.message,
           },
         ],
       };
@@ -201,6 +495,150 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Search results for "${result.query}":\n` +
               `Total found: ${result.totalFound}\n\n${recipesList}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  // ----------------------
+  // Suggestion Tools
+  // ----------------------
+  createMCPTool({
+    name: "create_suggestion",
+    description: "Create a new suggestion for feature requests, bugs, or improvements",
+    schema: z.object({
+      title: z.string().describe("Brief title for the suggestion"),
+      description: z.string().describe("Detailed description of the suggestion"),
+      category: z
+        .enum(["feature", "bug", "improvement", "other"])
+        .optional()
+        .describe("Category of the suggestion"),
+      priority: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Priority level"),
+      relatedRecipeId: z
+        .string()
+        .optional()
+        .describe("Optional ID of a related recipe"),
+    }),
+    handler: async ({
+      title,
+      description,
+      category,
+      priority,
+      relatedRecipeId,
+    }) => {
+      const result = await api.createSuggestion({
+        title,
+        description,
+        category,
+        priority,
+        relatedRecipeId,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created suggestion: ${result.title}\n` +
+              `ID: ${result.id}\n` +
+              `Category: ${result.category}\n` +
+              `Priority: ${result.priority}\n` +
+              `Status: ${result.status}\n` +
+              `Votes: ${result.votes}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "list_suggestions",
+    description: "List suggestions with optional filtering by status and pagination",
+    schema: z.object({
+      limit: z
+        .number()
+        .optional()
+        .describe("Number of suggestions to return (default: 20)"),
+      offset: z
+        .number()
+        .optional()
+        .describe("Number of suggestions to skip for pagination (default: 0)"),
+      status: z
+        .enum(["submitted", "under-review", "accepted", "rejected", "implemented"])
+        .optional()
+        .describe("Filter by status"),
+    }),
+    handler: async ({ limit, offset, status }) => {
+      const result = await api.listSuggestions({ limit, offset, status });
+      const suggestionsList = result.suggestions
+        .map(
+          (suggestion) =>
+            `- ${suggestion.title} (${suggestion.id})\n` +
+            `  Status: ${suggestion.status} | Priority: ${suggestion.priority} | Votes: ${suggestion.votes}\n` +
+            `  ${suggestion.description.substring(0, 100)}...`
+        )
+        .join("\n\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${result.suggestions.length} suggestions:\n\n${suggestionsList}\n\n` +
+              `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "vote_suggestion",
+    description: "Vote for or unvote a suggestion (toggles vote)",
+    schema: z.object({
+      id: z.string().describe("The ID of the suggestion to vote on"),
+    }),
+    handler: async ({ id }) => {
+      const result = await api.voteSuggestion(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `${result.voted ? "Voted for" : "Removed vote from"} suggestion: ${result.title}\n` +
+              `ID: ${result.id}\n` +
+              `Total votes: ${result.votes}\n` +
+              `Status: ${result.status}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "update_suggestion",
+    description: "Update the status of a suggestion (admin operation)",
+    schema: z.object({
+      id: z.string().describe("The ID of the suggestion to update"),
+      status: z
+        .enum(["submitted", "under-review", "accepted", "rejected", "implemented"])
+        .describe("New status for the suggestion"),
+    }),
+    handler: async ({ id, status }) => {
+      const result = await api.updateSuggestion(id, { id, status });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated suggestion: ${result.title}\n` +
+              `ID: ${result.id}\n` +
+              `New status: ${result.status}\n` +
+              `Priority: ${result.priority}\n` +
+              `Votes: ${result.votes}`,
           },
         ],
       };
