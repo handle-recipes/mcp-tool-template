@@ -1,6 +1,173 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import { UNITS, Unit, RecipeIngredient, RecipeStep } from "./types";
+
+// ----------------------
+// Validation helpers
+// ----------------------
+
+interface ValidationError {
+  field: string;
+  message: string;
+  example?: string;
+}
+
+function validateRecipeIngredients(
+  ingredients: any[]
+): { valid: boolean; errors: ValidationError[] } {
+  const errors: ValidationError[] = [];
+
+  if (!Array.isArray(ingredients)) {
+    return {
+      valid: false,
+      errors: [
+        {
+          field: "ingredients",
+          message:
+            "ingredients must be an array. Received: " + typeof ingredients,
+          example: '[{"ingredientId": "egg", "quantity": 2, "unit": "piece"}]',
+        },
+      ],
+    };
+  }
+
+  if (ingredients.length === 0) {
+    errors.push({
+      field: "ingredients",
+      message: "Recipe must have at least one ingredient",
+      example: '[{"ingredientId": "egg", "quantity": 2, "unit": "piece"}]',
+    });
+  }
+
+  ingredients.forEach((ing, idx) => {
+    if (!ing.ingredientId || typeof ing.ingredientId !== "string") {
+      errors.push({
+        field: `ingredients[${idx}].ingredientId`,
+        message: `Missing or invalid ingredientId at index ${idx}. Must be a string ID.`,
+        example: '"ingredientId": "tomato"',
+      });
+    }
+
+    if (!ing.unit) {
+      errors.push({
+        field: `ingredients[${idx}].unit`,
+        message: `Missing unit at index ${idx}. Must be one of: ${UNITS.join(", ")}`,
+        example: '"unit": "g" or "unit": "piece" or "unit": "free_text"',
+      });
+    } else if (!UNITS.includes(ing.unit as Unit)) {
+      errors.push({
+        field: `ingredients[${idx}].unit`,
+        message: `Invalid unit "${ing.unit}" at index ${idx}. Must be one of: ${UNITS.join(", ")}`,
+        example: '"unit": "g"',
+      });
+    }
+
+    if (ing.unit === "free_text") {
+      if (!ing.quantityText || typeof ing.quantityText !== "string") {
+        errors.push({
+          field: `ingredients[${idx}].quantityText`,
+          message: `When unit is "free_text", quantityText is required at index ${idx}`,
+          example: '"quantityText": "a pinch" or "to taste"',
+        });
+      }
+    } else {
+      if (
+        ing.quantity === undefined ||
+        ing.quantity === null ||
+        typeof ing.quantity !== "number"
+      ) {
+        errors.push({
+          field: `ingredients[${idx}].quantity`,
+          message: `quantity is required and must be a number when unit is not "free_text" at index ${idx}`,
+          example: '"quantity": 200',
+        });
+      } else if (ing.quantity <= 0) {
+        errors.push({
+          field: `ingredients[${idx}].quantity`,
+          message: `quantity must be greater than 0 at index ${idx}. Received: ${ing.quantity}`,
+          example: '"quantity": 200',
+        });
+      }
+    }
+  });
+
+  return { valid: errors.length === 0, errors };
+}
+
+function validateRecipeSteps(
+  steps: any[]
+): { valid: boolean; errors: ValidationError[] } {
+  const errors: ValidationError[] = [];
+
+  if (!Array.isArray(steps)) {
+    return {
+      valid: false,
+      errors: [
+        {
+          field: "steps",
+          message: "steps must be an array. Received: " + typeof steps,
+          example: '[{"text": "Preheat oven to 180°C"}]',
+        },
+      ],
+    };
+  }
+
+  if (steps.length === 0) {
+    errors.push({
+      field: "steps",
+      message: "Recipe must have at least one step",
+      example: '[{"text": "Mix ingredients together"}]',
+    });
+  }
+
+  steps.forEach((step, idx) => {
+    if (!step.text || typeof step.text !== "string") {
+      errors.push({
+        field: `steps[${idx}].text`,
+        message: `Missing or invalid text at step ${idx}. Must be a non-empty string.`,
+        example: '"text": "Preheat oven to 180°C"',
+      });
+    } else if (step.text.trim().length === 0) {
+      errors.push({
+        field: `steps[${idx}].text`,
+        message: `Step text cannot be empty at index ${idx}`,
+        example: '"text": "Mix all ingredients"',
+      });
+    }
+
+    if (step.equipment !== undefined && !Array.isArray(step.equipment)) {
+      errors.push({
+        field: `steps[${idx}].equipment`,
+        message: `equipment must be an array at step ${idx}. Received: ${typeof step.equipment}`,
+        example: '"equipment": ["oven", "mixing bowl"]',
+      });
+    }
+
+    if (step.imageUrl !== undefined && typeof step.imageUrl !== "string") {
+      errors.push({
+        field: `steps[${idx}].imageUrl`,
+        message: `imageUrl must be a string at step ${idx}`,
+        example: '"imageUrl": "https://example.com/image.jpg"',
+      });
+    }
+  });
+
+  return { valid: errors.length === 0, errors };
+}
+
+function formatValidationErrors(errors: ValidationError[]): string {
+  let message = "Validation failed. Please fix the following errors:\n\n";
+  errors.forEach((err, idx) => {
+    message += `${idx + 1}. Field: ${err.field}\n`;
+    message += `   Error: ${err.message}\n`;
+    if (err.example) {
+      message += `   Example: ${err.example}\n`;
+    }
+    message += "\n";
+  });
+  return message;
+}
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -445,31 +612,167 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      const result = await api.createRecipe({
-        name,
-        description,
-        servings,
-        ingredients,
-        steps,
-        tags,
-        categories,
-        sourceUrl,
-      });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text:
-              `Successfully created recipe!\n` +
-              `ID: ${result.id}\n` +
-              `Name: ${result.name}\n` +
-              `Slug: ${result.slug}\n` +
-              `Servings: ${result.servings}\n` +
-              `Ingredients: ${result.ingredients.length}\n` +
-              `Steps: ${result.steps.length}`,
-          },
-        ],
-      };
+      // Step 1: Validate basic fields
+      const basicErrors: ValidationError[] = [];
+
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        basicErrors.push({
+          field: "name",
+          message: "Recipe name is required and must be a non-empty string",
+          example: '"name": "Chocolate Cake"',
+        });
+      }
+
+      if (
+        !description ||
+        typeof description !== "string" ||
+        description.trim().length === 0
+      ) {
+        basicErrors.push({
+          field: "description",
+          message:
+            "Recipe description is required and must be a non-empty string",
+          example: '"description": "A delicious chocolate cake recipe"',
+        });
+      }
+
+      if (
+        servings === undefined ||
+        servings === null ||
+        typeof servings !== "number"
+      ) {
+        basicErrors.push({
+          field: "servings",
+          message: "servings is required and must be a number",
+          example: '"servings": 4',
+        });
+      } else if (servings <= 0 || !Number.isInteger(servings)) {
+        basicErrors.push({
+          field: "servings",
+          message: "servings must be a positive integer",
+          example: '"servings": 4',
+        });
+      }
+
+      if (basicErrors.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(basicErrors),
+            },
+          ],
+        };
+      }
+
+      // Step 2: Validate ingredients
+      const ingredientsValidation = validateRecipeIngredients(ingredients);
+      if (!ingredientsValidation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(ingredientsValidation.errors),
+            },
+          ],
+        };
+      }
+
+      // Step 3: Validate steps
+      const stepsValidation = validateRecipeSteps(steps);
+      if (!stepsValidation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(stepsValidation.errors),
+            },
+          ],
+        };
+      }
+
+      // Step 4: Validate optional fields
+      const optionalErrors: ValidationError[] = [];
+
+      if (tags !== undefined && !Array.isArray(tags)) {
+        optionalErrors.push({
+          field: "tags",
+          message: "tags must be an array of strings",
+          example: '"tags": ["vegan", "dessert"]',
+        });
+      }
+
+      if (categories !== undefined && !Array.isArray(categories)) {
+        optionalErrors.push({
+          field: "categories",
+          message: "categories must be an array of strings",
+          example: '"categories": ["dessert", "norwegian"]',
+        });
+      }
+
+      if (
+        sourceUrl !== undefined &&
+        sourceUrl !== null &&
+        typeof sourceUrl !== "string"
+      ) {
+        optionalErrors.push({
+          field: "sourceUrl",
+          message: "sourceUrl must be a string",
+          example: '"sourceUrl": "https://example.com/recipe"',
+        });
+      }
+
+      if (optionalErrors.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(optionalErrors),
+            },
+          ],
+        };
+      }
+
+      // All validation passed, create the recipe
+      try {
+        const result = await api.createRecipe({
+          name,
+          description,
+          servings,
+          ingredients: ingredients as RecipeIngredient[],
+          steps: steps as RecipeStep[],
+          tags,
+          categories,
+          sourceUrl,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully created recipe!\n` +
+                `ID: ${result.id}\n` +
+                `Name: ${result.name}\n` +
+                `Slug: ${result.slug}\n` +
+                `Servings: ${result.servings}\n` +
+                `Ingredients: ${result.ingredients.length}\n` +
+                `Steps: ${result.steps.length}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Failed to create recipe. API error:\n\n` +
+                `${error.message || JSON.stringify(error)}\n\n` +
+                `Please ensure all ingredient IDs exist in the system.`,
+            },
+          ],
+        };
+      }
     },
   }),
 
@@ -594,6 +897,244 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           },
         ],
       };
+    },
+  }),
+
+  // ----------------------
+  // Partial update tools for recipes
+  // ----------------------
+
+  createMCPTool({
+    name: "update_recipe_metadata",
+    description:
+      "Update only the metadata (name, description, servings, tags, categories, sourceUrl) of a recipe without changing ingredients or steps",
+    schema: z.object({
+      id: z.string().describe("The ID of the recipe to update"),
+      name: z.string().optional().describe("Updated recipe name"),
+      description: z.string().optional().describe("Updated description"),
+      servings: z.number().optional().describe("Updated number of servings"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Updated tags (replaces existing tags)"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Updated categories (replaces existing categories)"),
+      sourceUrl: z.string().optional().describe("Updated source URL"),
+    }),
+    handler: async ({
+      id,
+      name,
+      description,
+      servings,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const errors: ValidationError[] = [];
+
+      if (servings !== undefined && (servings <= 0 || !Number.isInteger(servings))) {
+        errors.push({
+          field: "servings",
+          message: "servings must be a positive integer",
+          example: '"servings": 4',
+        });
+      }
+
+      if (errors.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        const result = await api.updateRecipe(id, {
+          id,
+          name,
+          description,
+          servings,
+          tags,
+          categories,
+          sourceUrl,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully updated recipe metadata!\n` +
+                `ID: ${result.id}\n` +
+                `Name: ${result.name}\n` +
+                `Description: ${result.description}\n` +
+                `Servings: ${result.servings}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to update recipe metadata. API error:\n\n${error.message || JSON.stringify(error)}`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "update_recipe_ingredients",
+    description:
+      "Update only the ingredients list of a recipe. This replaces all existing ingredients.",
+    schema: z.object({
+      id: z.string().describe("The ID of the recipe to update"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string().describe("ID of the ingredient"),
+            quantity: z
+              .number()
+              .optional()
+              .describe("Quantity (omit if using free_text unit)"),
+            unit: z
+              .enum([
+                "g",
+                "kg",
+                "ml",
+                "l",
+                "oz",
+                "lb",
+                "tsp",
+                "tbsp",
+                "fl oz",
+                "cup",
+                "pint",
+                "quart",
+                "gallon",
+                "piece",
+                "free_text",
+              ])
+              .describe("Unit of measurement for the ingredient"),
+            quantityText: z
+              .string()
+              .optional()
+              .describe('Free-form text when unit is "free_text"'),
+            note: z.string().optional().describe("Additional note (e.g., chopped)"),
+          })
+        )
+        .describe("Complete list of ingredients (replaces existing)"),
+    }),
+    handler: async ({ id, ingredients }) => {
+      const ingredientsValidation = validateRecipeIngredients(ingredients);
+      if (!ingredientsValidation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(ingredientsValidation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        const result = await api.updateRecipe(id, {
+          id,
+          ingredients: ingredients as RecipeIngredient[],
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully updated recipe ingredients!\n` +
+                `Recipe: ${result.name}\n` +
+                `Ingredients count: ${result.ingredients.length}\n\n` +
+                `Ingredients:\n${result.ingredients.map((ing, idx) => `${idx + 1}. ${ing.quantity || ""} ${ing.unit === "free_text" ? ing.quantityText : ing.unit} - Ingredient ID: ${ing.ingredientId}`).join("\n")}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Failed to update recipe ingredients. API error:\n\n${error.message || JSON.stringify(error)}\n\n` +
+                `Please ensure all ingredient IDs exist in the system.`,
+            },
+          ],
+        };
+      }
+    },
+  }),
+
+  createMCPTool({
+    name: "update_recipe_steps",
+    description:
+      "Update only the steps/instructions of a recipe. This replaces all existing steps.",
+    schema: z.object({
+      id: z.string().describe("The ID of the recipe to update"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string().describe("Instruction text for the step"),
+            imageUrl: z.string().optional().describe("Optional image URL"),
+            equipment: z
+              .array(z.string())
+              .optional()
+              .describe("Optional equipment for this step"),
+          })
+        )
+        .describe("Complete ordered list of recipe steps (replaces existing)"),
+    }),
+    handler: async ({ id, steps }) => {
+      const stepsValidation = validateRecipeSteps(steps);
+      if (!stepsValidation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: formatValidationErrors(stepsValidation.errors),
+            },
+          ],
+        };
+      }
+
+      try {
+        const result = await api.updateRecipe(id, {
+          id,
+          steps: steps as RecipeStep[],
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Successfully updated recipe steps!\n` +
+                `Recipe: ${result.name}\n` +
+                `Steps count: ${result.steps.length}\n\n` +
+                `Steps:\n${result.steps.map((step, idx) => `${idx + 1}. ${step.text.substring(0, 60)}...`).join("\n")}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to update recipe steps. API error:\n\n${error.message || JSON.stringify(error)}`,
+            },
+          ],
+        };
+      }
     },
   }),
 
