@@ -5,7 +5,6 @@
 // ----------------------
 // Common / utility types
 // ----------------------
-export type FirestoreTimestamp = { seconds: number; nanoseconds: number };
 
 // Injected into MCP servers via ENV and forwarded in requests
 export type GroupId = string;
@@ -63,8 +62,8 @@ export interface Ingredient {
   allergens: string[];
 
   /** Provenance / audit */
-  createdAt: FirestoreTimestamp;
-  updatedAt: FirestoreTimestamp;
+  createdAt: string;
+  updatedAt: string;
   createdByGroupId: GroupId;
   updatedByGroupId: GroupId;
 
@@ -144,8 +143,8 @@ export interface Recipe {
   sourceUrl?: string;
 
   /** Provenance / audit */
-  createdAt: FirestoreTimestamp;
-  updatedAt: FirestoreTimestamp;
+  createdAt: string;
+  updatedAt: string;
   createdByGroupId: GroupId;
   updatedByGroupId: GroupId;
 

@@ -108,9 +108,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
               `Source URL: ${result.sourceUrl || "None"}\n` +
               `Ingredients:\n${ingredientsList}\n\n` +
               `Steps:\n${stepsList}\n\n` +
-              `Updated: ${new Date(
-                result.updatedAt.seconds * 1000
-              ).toISOString()}\n` +
+              `Updated: ${result.updatedAt}\n` +
               `Created by Group: ${result.createdByGroupId}`,
           },
         ],
