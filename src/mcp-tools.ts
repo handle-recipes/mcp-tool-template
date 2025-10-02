@@ -485,4 +485,57 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       };
     },
   }),
+
+  createMCPTool({
+    name: "add_step_to_all_recipes",
+    description: "Add a step at the beginning of all recipes",
+    schema: z.object({
+      text: z.string().describe("Step instruction text"),
+      imageUrl: z.string().optional().describe("Optional image URL"),
+      equipment: z
+        .array(z.string())
+        .optional()
+        .describe("Optional equipment needed"),
+    }),
+    handler: async ({ text, imageUrl, equipment }) => {
+      const result = await api.addStepToAllRecipes({
+        text,
+        imageUrl,
+        equipment,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Bulk operation completed:\n` +
+              `Updated: ${result.updated} recipes\n` +
+              `Failed: ${result.failed} recipes`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "add_prefix_to_all_recipe_names",
+    description: "Add a text prefix to all recipe names",
+    schema: z.object({
+      prefix: z.string().describe("Text to add at the start of recipe names"),
+    }),
+    handler: async ({ prefix }) => {
+      const result = await api.addPrefixToAllRecipeNames(prefix);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Bulk operation completed:\n` +
+              `Updated: ${result.updated} recipes\n` +
+              `Failed: ${result.failed} recipes`,
+          },
+        ],
+      };
+    },
+  }),
 ];

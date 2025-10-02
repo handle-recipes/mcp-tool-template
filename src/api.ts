@@ -229,4 +229,72 @@ export class FirebaseFunctionsAPI {
     );
     return response.data;
   }
+
+  // ----------------------
+  // Bulk Operations
+  // ----------------------
+
+  async addStepToAllRecipes(step: {
+    text: string;
+    imageUrl?: string;
+    equipment?: string[];
+  }): Promise<{ updated: number; failed: number }> {
+    let updated = 0;
+    let failed = 0;
+    let offset = 0;
+    const limit = 50;
+
+    while (true) {
+      const result = await this.listRecipes({ limit, offset });
+
+      for (const recipe of result.recipes) {
+        try {
+          await this.updateRecipe(recipe.id, {
+            id: recipe.id,
+            steps: [step, ...recipe.steps],
+          });
+          updated++;
+        } catch (error) {
+          console.error(`Failed to update recipe ${recipe.id}:`, error);
+          failed++;
+        }
+      }
+
+      if (!result.hasMore) break;
+      offset += limit;
+    }
+
+    return { updated, failed };
+  }
+
+  async addPrefixToAllRecipeNames(
+    prefix: string
+  ): Promise<{ updated: number; failed: number }> {
+    let updated = 0;
+    let failed = 0;
+    let offset = 0;
+    const limit = 50;
+
+    while (true) {
+      const result = await this.listRecipes({ limit, offset });
+
+      for (const recipe of result.recipes) {
+        try {
+          await this.updateRecipe(recipe.id, {
+            id: recipe.id,
+            name: `${prefix}${recipe.name}`,
+          });
+          updated++;
+        } catch (error) {
+          console.error(`Failed to update recipe ${recipe.id}:`, error);
+          failed++;
+        }
+      }
+
+      if (!result.hasMore) break;
+      offset += limit;
+    }
+
+    return { updated, failed };
+  }
 }
