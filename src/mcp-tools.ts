@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import { UNITS } from "./types";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -10,38 +11,21 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the ingredient to retrieve"),
     }),
     handler: async ({ id }) => {
-      try {
-        const result = await api.getIngredient(id);
-        
-        const createdAtText = result.createdAt?.seconds 
-          ? new Date(result.createdAt.seconds * 1000).toISOString()
-          : "Unknown";
-        
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Ingredient: ${result.name}\n` +
-                `ID: ${result.id}\n` +
-                `Aliases: ${result.aliases?.join(", ") || "None"}\n` +
-                `Categories: ${result.categories?.join(", ") || "None"}\n` +
-                `Allergens: ${result.allergens?.join(", ") || "None"}\n` +
-                `Created: ${createdAtText}\n` +
-                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error getting ingredient: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.getIngredient(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
+              `Created by Group: ${result.createdByGroupId}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -59,37 +43,26 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Number of ingredients to skip for pagination (default: 0)"),
     }),
     handler: async ({ limit, offset }) => {
-      try {
-        const result = await api.listIngredients({ limit, offset });
-        const ingredientsList = result.ingredients
-          ?.map(
-            (ing) =>
-              `- ${ing.name} (${ing.id}) - Categories: ${
-                ing.categories?.join(", ") || "None"
-              }`
-          )
-          .join("\n") || "None";
+      const result = await api.listIngredients({ limit, offset });
+      const ingredientsList = result.ingredients
+        .map(
+          (ing) =>
+            `- ${ing.name} (${ing.id}) - Categories: ${
+              ing.categories.join(", ") || "None"
+            }`
+        )
+        .join("\n");
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Found ${result.ingredients?.length || 0} ingredients:\n\n${ingredientsList}\n\n` +
-                `Has more results: ${result.hasMore || false}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error listing ingredients: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${result.ingredients.length} ingredients:\n\n${ingredientsList}\n\n` +
+              `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -100,70 +73,47 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the recipe to retrieve"),
     }),
     handler: async ({ id }) => {
-      try {
-        const result = await api.getRecipe(id);
-        
-        const ingredientsList = result.ingredients
-          ?.map((ing) => {
-            const quantityText =
-              ing.unit === "free_text"
-                ? ing.quantityText
-                : `${ing.quantity || ""} ${ing.unit}`;
-            return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
-              ing.note ? ` - ${ing.note}` : ""
-            }`;
-          })
-          .join("\n") || "None";
-        
-        const stepsList = result.steps
-          ?.map(
-            (step, i) =>
-              `${i + 1}. ${step.text}${
-                step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
-              }`
-          )
-          .join("\n") || "None";
+      const result = await api.getRecipe(id);
+      const ingredientsList = result.ingredients
+        .map((ing) => {
+          const quantityText =
+            ing.unit === "free_text"
+              ? ing.quantityText
+              : `${ing.quantity || ""} ${ing.unit}`;
+          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
+            ing.note ? ` - ${ing.note}` : ""
+          }`;
+        })
+        .join("\n");
+      const stepsList = result.steps
+        .map(
+          (step, i) =>
+            `${i + 1}. ${step.text}${
+              step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
+            }`
+        )
+        .join("\n");
 
-        const createdAtText = result.createdAt?.seconds 
-          ? new Date(result.createdAt.seconds * 1000).toISOString()
-          : "Unknown";
-        
-        const updatedAtText = result.updatedAt?.seconds 
-          ? new Date(result.updatedAt.seconds * 1000).toISOString()
-          : "Unknown";
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Recipe: ${result.name}\n` +
-                `ID: ${result.id}\n` +
-                `Slug: ${result.slug || "Unknown"}\n` +
-                `Description: ${result.description}\n` +
-                `Servings: ${result.servings}\n` +
-                `Tags: ${result.tags?.join(", ") || "None"}\n` +
-                `Categories: ${result.categories?.join(", ") || "None"}\n` +
-                `Source URL: ${result.sourceUrl || "None"}\n` +
-                `Image URL: ${result.imageUrl || "None"}\n\n` +
-                `Ingredients:\n${ingredientsList}\n\n` +
-                `Steps:\n${stepsList}\n\n` +
-                `Created: ${createdAtText}\n` +
-                `Updated: ${updatedAtText}\n` +
-                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error getting recipe: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Recipe: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Slug: ${result.slug}\n` +
+              `Description: ${result.description}\n` +
+              `Servings: ${result.servings}\n` +
+              `Tags: ${result.tags.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Source URL: ${result.sourceUrl || "None"}\n` +
+              `Ingredients:\n${ingredientsList}\n\n` +
+              `Steps:\n${stepsList}\n\n` +
+              `Updated: ${result.updatedAt}\n` +
+              `Created by Group: ${result.createdByGroupId}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -181,41 +131,31 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Number of recipes to skip for pagination (default: 0)"),
     }),
     handler: async ({ limit, offset }) => {
-      try {
-        const result = await api.listRecipes({ limit, offset });
-        const recipesList = result.recipes
-          ?.map(
-            (recipe) =>
-              `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
-          )
-          .join("\n") || "None";
+      const result = await api.listRecipes({ limit, offset });
+      const recipesList = result.recipes
+        .map(
+          (recipe) =>
+            `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
+        )
+        .join("\n");
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Found ${result.recipes?.length || 0} recipes:\n\n${recipesList}\n\n` +
-                `Has more results: ${result.hasMore || false}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error listing recipes: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${result.recipes.length} recipes:\n\n${recipesList}\n\n` +
+              `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
     },
   }),
 
   createMCPTool({
     name: "search_recipes",
-    description: "Search recipes using keyword-based search with optional filtering",
+    description:
+      "Search recipes using keyword-based search with optional filtering",
     schema: z.object({
       query: z
         .string()
@@ -238,44 +178,33 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Maximum number of results (1-50, default: 20)"),
     }),
     handler: async ({ query, ingredients, tags, categories, limit }) => {
-      try {
-        const result = await api.searchRecipes({
-          query,
-          ingredients,
-          tags,
-          categories,
-          limit,
-        });
-        const recipesList = result.recipes
-          ?.map(
-            (recipe) =>
-              `- ${recipe.name} (${recipe.id}) - ${recipe.description?.substring(
-                0,
-                100
-              ) || "No description"}...`
-          )
-          .join("\n") || "None";
+      const result = await api.searchRecipes({
+        query,
+        ingredients,
+        tags,
+        categories,
+        limit,
+      });
+      const recipesList = result.recipes
+        .map(
+          (recipe) =>
+            `- ${recipe.name} (${recipe.id}) - ${recipe.description.substring(
+              0,
+              100
+            )}...`
+        )
+        .join("\n");
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Search results for "${result.query}":\n` +
-                `Total found: ${result.totalFound || 0}\n\n${recipesList}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error searching recipes: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Search results for "${result.query}":\n` +
+              `Total found: ${result.totalFound}\n\n${recipesList}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -287,54 +216,38 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       aliases: z
         .array(z.string())
         .optional()
-        .describe("Alternative names for the ingredient"),
+        .describe("Optional array of alternative names"),
       categories: z
         .array(z.string())
         .optional()
-        .describe("Categories the ingredient belongs to"),
+        .describe("Optional array of categories (e.g., 'vegetable', 'spice')"),
       allergens: z
         .array(z.string())
         .optional()
-        .describe("Allergens present in the ingredient"),
+        .describe(
+          "Optional array of allergens (e.g., 'nuts', 'gluten', 'dairy')"
+        ),
     }),
     handler: async ({ name, aliases, categories, allergens }) => {
-      try {
-        const result = await api.createIngredient({
-          name,
-          aliases,
-          categories,
-          allergens,
-        });
-        
-        const createdAtText = result.createdAt?.seconds 
-          ? new Date(result.createdAt.seconds * 1000).toISOString()
-          : "Unknown";
-        
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Created ingredient: ${result.name}\n` +
-                `ID: ${result.id}\n` +
-                `Aliases: ${result.aliases?.join(", ") || "None"}\n` +
-                `Categories: ${result.categories?.join(", ") || "None"}\n` +
-                `Allergens: ${result.allergens?.join(", ") || "None"}\n` +
-                `Created: ${createdAtText}\n` +
-                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error creating ingredient: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.createIngredient({
+        name,
+        aliases,
+        categories,
+        allergens,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -343,59 +256,41 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     description: "Update an existing ingredient",
     schema: z.object({
       id: z.string().describe("The ID of the ingredient to update"),
-      name: z.string().optional().describe("New name for the ingredient"),
+      name: z.string().optional().describe("The new name of the ingredient"),
       aliases: z
         .array(z.string())
         .optional()
-        .describe("New aliases for the ingredient"),
+        .describe("Updated array of alternative names"),
       categories: z
         .array(z.string())
         .optional()
-        .describe("New categories for the ingredient"),
+        .describe("Updated array of categories"),
       allergens: z
         .array(z.string())
         .optional()
-        .describe("New allergens for the ingredient"),
+        .describe("Updated array of allergens"),
     }),
     handler: async ({ id, name, aliases, categories, allergens }) => {
-      try {
-        const result = await api.updateIngredient(id, {
-          id,
-          name,
-          aliases,
-          categories,
-          allergens,
-        });
-        
-        const updatedAtText = result.updatedAt?.seconds 
-          ? new Date(result.updatedAt.seconds * 1000).toISOString()
-          : "Unknown";
-        
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Updated ingredient: ${result.name}\n` +
-                `ID: ${result.id}\n` +
-                `Aliases: ${result.aliases?.join(", ") || "None"}\n` +
-                `Categories: ${result.categories?.join(", ") || "None"}\n` +
-                `Allergens: ${result.allergens?.join(", ") || "None"}\n` +
-                `Updated: ${updatedAtText}\n` +
-                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error updating ingredient: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.updateIngredient(id, {
+        id,
+        name,
+        aliases,
+        categories,
+        allergens,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated ingredient: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
+              `Categories: ${result.categories.join(", ") || "None"}\n` +
+              `Allergens: ${result.allergens.join(", ") || "None"}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -406,26 +301,15 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the ingredient to delete"),
     }),
     handler: async ({ id }) => {
-      try {
-        const result = await api.deleteIngredient(id);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Deleted ingredient: ${result.message}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error deleting ingredient: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.deleteIngredient(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.message,
+          },
+        ],
+      };
     },
   }),
 
@@ -434,47 +318,46 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     description: "Create a new recipe",
     schema: z.object({
       name: z.string().describe("The name of the recipe"),
-      description: z.string().describe("Description of the recipe"),
-      servings: z.number().describe("Number of servings the recipe makes"),
+      description: z.string().describe("A description of the recipe"),
+      servings: z.number().describe("Number of servings this recipe makes"),
       ingredients: z
         .array(
           z.object({
             ingredientId: z.string().describe("ID of the ingredient"),
-            quantity: z.number().optional().describe("Quantity of ingredient"),
+            quantity: z.number().optional().describe("Amount of ingredient"),
             unit: z
-              .enum(["g", "kg", "ml", "l", "piece", "free_text"])
-              .describe("Unit of measurement"),
+              .enum(UNITS)
+              .describe(
+                "Unit of measurement (g, kg, ml, l, oz, lb, tsp, tbsp, fl oz, cup, pint, quart, gallon, piece, free_text)"
+              ),
             quantityText: z
               .string()
               .optional()
-              .describe("Free-text quantity description"),
+              .describe("Free text quantity (when unit is 'free_text')"),
             note: z.string().optional().describe("Additional notes"),
           })
         )
-        .describe("List of ingredients with quantities"),
+        .describe("Array of ingredients with quantities"),
       steps: z
         .array(
           z.object({
-            text: z.string().describe("Step instruction text"),
+            text: z.string().describe("Step instructions"),
             equipment: z
               .array(z.string())
               .optional()
               .describe("Required equipment for this step"),
           })
         )
-        .describe("Cooking steps"),
-      tags: z
-        .array(z.string())
-        .optional()
-        .describe("Tags for categorizing the recipe"),
+        .describe("Array of cooking steps"),
+      tags: z.array(z.string()).optional().describe("Optional array of tags"),
       categories: z
         .array(z.string())
         .optional()
-        .describe("Categories the recipe belongs to"),
+        .describe("Optional array of categories"),
       sourceUrl: z
         .string()
         .optional()
-        .describe("URL source of the recipe"),
+        .describe("Optional URL to the original recipe source"),
     }),
     handler: async ({
       name,
@@ -486,52 +369,30 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      try {
-        const result = await api.createRecipe({
-          name,
-          description,
-          servings,
-          ingredients,
-          steps,
-          tags,
-          categories,
-          sourceUrl,
-        });
-        
-        const createdAtText = result.createdAt?.seconds 
-          ? new Date(result.createdAt.seconds * 1000).toISOString()
-          : "Unknown";
-        
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Created recipe: ${result.name}\n` +
-                `ID: ${result.id}\n` +
-                `Slug: ${result.slug || "Unknown"}\n` +
-                `Description: ${result.description}\n` +
-                `Servings: ${result.servings}\n` +
-                `Ingredients: ${result.ingredients?.length || 0} items\n` +
-                `Steps: ${result.steps?.length || 0} steps\n` +
-                `Tags: ${result.tags?.join(", ") || "None"}\n` +
-                `Categories: ${result.categories?.join(", ") || "None"}\n` +
-                `Source URL: ${result.sourceUrl || "None"}\n` +
-                `Created: ${createdAtText}\n` +
-                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error creating recipe: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created recipe: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Slug: ${result.slug}\n` +
+              `Servings: ${result.servings}\n` +
+              `Ingredients: ${result.ingredients.length}\n` +
+              `Steps: ${result.steps.length}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -540,50 +401,36 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
     description: "Update an existing recipe",
     schema: z.object({
       id: z.string().describe("The ID of the recipe to update"),
-      name: z.string().optional().describe("New name for the recipe"),
-      description: z.string().optional().describe("New description"),
-      servings: z.number().optional().describe("New number of servings"),
+      name: z.string().optional().describe("Updated name"),
+      description: z.string().optional().describe("Updated description"),
+      servings: z.number().optional().describe("Updated servings count"),
       ingredients: z
         .array(
           z.object({
             ingredientId: z.string().describe("ID of the ingredient"),
-            quantity: z.number().optional().describe("Quantity of ingredient"),
-            unit: z
-              .enum(["g", "kg", "ml", "l", "piece", "free_text"])
-              .describe("Unit of measurement"),
-            quantityText: z
-              .string()
-              .optional()
-              .describe("Free-text quantity description"),
+            quantity: z.number().optional().describe("Amount of ingredient"),
+            unit: z.enum(UNITS).describe("Unit of measurement"),
+            quantityText: z.string().optional().describe("Free text quantity"),
             note: z.string().optional().describe("Additional notes"),
           })
         )
         .optional()
-        .describe("New list of ingredients"),
+        .describe("Updated ingredients array"),
       steps: z
         .array(
           z.object({
-            text: z.string().describe("Step instruction text"),
+            text: z.string().describe("Step instructions"),
             equipment: z
               .array(z.string())
               .optional()
-              .describe("Required equipment for this step"),
+              .describe("Required equipment"),
           })
         )
         .optional()
-        .describe("New cooking steps"),
-      tags: z
-        .array(z.string())
-        .optional()
-        .describe("New tags for the recipe"),
-      categories: z
-        .array(z.string())
-        .optional()
-        .describe("New categories for the recipe"),
-      sourceUrl: z
-        .string()
-        .optional()
-        .describe("New source URL for the recipe"),
+        .describe("Updated steps array"),
+      tags: z.array(z.string()).optional().describe("Updated tags"),
+      categories: z.array(z.string()).optional().describe("Updated categories"),
+      sourceUrl: z.string().optional().describe("Updated source URL"),
     }),
     handler: async ({
       id,
@@ -596,53 +443,30 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      try {
-        const result = await api.updateRecipe(id, {
-          id,
-          name,
-          description,
-          servings,
-          ingredients,
-          steps,
-          tags,
-          categories,
-          sourceUrl,
-        });
-        
-        const updatedAtText = result.updatedAt?.seconds 
-          ? new Date(result.updatedAt.seconds * 1000).toISOString()
-          : "Unknown";
-        
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                `Updated recipe: ${result.name}\n` +
-                `ID: ${result.id}\n` +
-                `Slug: ${result.slug || "Unknown"}\n` +
-                `Description: ${result.description}\n` +
-                `Servings: ${result.servings}\n` +
-                `Ingredients: ${result.ingredients?.length || 0} items\n` +
-                `Steps: ${result.steps?.length || 0} steps\n` +
-                `Tags: ${result.tags?.join(", ") || "None"}\n` +
-                `Categories: ${result.categories?.join(", ") || "None"}\n` +
-                `Source URL: ${result.sourceUrl || "None"}\n` +
-                `Updated: ${updatedAtText}\n` +
-                `Created by Group: ${result.createdByGroupId || "Unknown"}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error updating recipe: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.updateRecipe(id, {
+        id,
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated recipe: ${result.name}\n` +
+              `ID: ${result.id}\n` +
+              `Slug: ${result.slug}\n` +
+              `Servings: ${result.servings}\n` +
+              `Updated: ${result.updatedAt}`,
+          },
+        ],
+      };
     },
   }),
 
@@ -653,26 +477,169 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the recipe to delete"),
     }),
     handler: async ({ id }) => {
-      try {
-        const result = await api.deleteRecipe(id);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Deleted recipe: ${result.message}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error deleting recipe: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
+      const result = await api.deleteRecipe(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: result.message,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "create_suggestion",
+    description: "Create a new suggestion for a feature, bug, or improvement",
+    schema: z.object({
+      title: z.string().describe("Title of the suggestion"),
+      description: z
+        .string()
+        .describe("Detailed description of the suggestion"),
+      category: z
+        .enum(["feature", "bug", "improvement", "other"])
+        .optional()
+        .describe("Category of the suggestion"),
+      priority: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Priority level"),
+      relatedRecipeId: z
+        .string()
+        .optional()
+        .describe("Optional ID of a related recipe"),
+    }),
+    handler: async ({
+      title,
+      description,
+      category,
+      priority,
+      relatedRecipeId,
+    }) => {
+      const result = await api.createSuggestion({
+        title,
+        description,
+        category,
+        priority,
+        relatedRecipeId,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created suggestion: ${result.title}\n` +
+              `ID: ${result.id}\n` +
+              `Status: ${result.status}\n` +
+              `Category: ${result.category || "None"}\n` +
+              `Priority: ${result.priority || "None"}\n` +
+              `Votes: ${result.votes}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "list_suggestions",
+    description: "List suggestions with optional filtering and pagination",
+    schema: z.object({
+      limit: z.number().optional().describe("Number of suggestions to return"),
+      offset: z
+        .number()
+        .optional()
+        .describe("Number of suggestions to skip for pagination"),
+      status: z
+        .enum([
+          "submitted",
+          "under-review",
+          "accepted",
+          "rejected",
+          "implemented",
+        ])
+        .optional()
+        .describe("Filter by status"),
+    }),
+    handler: async ({ limit, offset, status }) => {
+      const result = await api.listSuggestions({ limit, offset, status });
+      const suggestionsList = result.suggestions
+        .map(
+          (sug) =>
+            `- ${sug.title} (${sug.id})\n` +
+            `  Status: ${sug.status}, Votes: ${sug.votes}, Category: ${
+              sug.category || "None"
+            }`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${result.suggestions.length} suggestions:\n\n${suggestionsList}\n\n` +
+              `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "vote_suggestion",
+    description:
+      "Vote for a suggestion (toggles vote - adds if not voted, removes if already voted)",
+    schema: z.object({
+      id: z.string().describe("The ID of the suggestion to vote for"),
+    }),
+    handler: async ({ id }) => {
+      const result = await api.voteSuggestion(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `${
+                result.voted ? "Voted for" : "Removed vote from"
+              } suggestion: ${result.title}\n` +
+              `ID: ${result.id}\n` +
+              `Current votes: ${result.votes}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "update_suggestion",
+    description: "Update the status of a suggestion",
+    schema: z.object({
+      id: z.string().describe("The ID of the suggestion to update"),
+      status: z
+        .enum([
+          "submitted",
+          "under-review",
+          "accepted",
+          "rejected",
+          "implemented",
+        ])
+        .describe("New status for the suggestion"),
+    }),
+    handler: async ({ id, status }) => {
+      const result = await api.updateSuggestion(id, { id, status });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Updated suggestion: ${result.title}\n` +
+              `ID: ${result.id}\n` +
+              `New status: ${result.status}\n` +
+              `Votes: ${result.votes}`,
+          },
+        ],
+      };
     },
   }),
 ];

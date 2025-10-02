@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "group-*" # only deploy branches like group-01, group-07
+      - "all-tools" # allow all-tools branch for full MCP tools deployment
   workflow_dispatch: # allow manual trigger
 
 jobs:
