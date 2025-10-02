@@ -296,16 +296,46 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "create_recipe",
-    description: "Create a new recipe",
+    description: `Create a new recipe with ingredients and cooking steps.
+
+INGREDIENT FORMAT:
+- ingredientId: (required) string - Must be a valid ingredient ID from the system
+- unit: (required) Must be one of: "g", "kg", "ml", "l", "oz", "lb", "tsp", "tbsp", "fl oz", "cup", "pint", "quart", "gallon", "piece", or "free_text"
+- quantity: (optional) number - Required for all units EXCEPT "free_text". Example: 200 for "200g"
+- quantityText: (optional) string - ONLY used when unit is "free_text". Example: "a pinch" or "to taste"
+- note: (optional) string - Additional notes like "finely chopped"
+
+VALID EXAMPLES:
+1. Standard unit: {"ingredientId": "123", "quantity": 200, "unit": "g"}
+2. Free text: {"ingredientId": "456", "unit": "free_text", "quantityText": "a pinch"}
+3. With note: {"ingredientId": "789", "quantity": 2, "unit": "cup", "note": "finely chopped"}
+
+STEP FORMAT:
+- text: (required) string - Description of the cooking step
+- equipment: (optional) array of strings - Required equipment like ["oven", "mixing bowl"]`,
     schema: z.object({
-      name: z.string().describe("The name of the recipe"),
-      description: z.string().describe("A description of the recipe"),
-      servings: z.number().describe("Number of servings"),
+      name: z.string().min(1).describe("Recipe name (required, non-empty)"),
+      description: z
+        .string()
+        .min(1)
+        .describe("Recipe description (required, non-empty)"),
+      servings: z
+        .number()
+        .positive()
+        .describe("Number of servings (required, must be positive)"),
       ingredients: z
         .array(
           z.object({
-            ingredientId: z.string().describe("ID of the ingredient"),
-            quantity: z.number().optional().describe("Quantity amount"),
+            ingredientId: z
+              .string()
+              .min(1)
+              .describe("Ingredient ID (required, non-empty string)"),
+            quantity: z
+              .number()
+              .optional()
+              .describe(
+                "Quantity amount (number). Required for all units EXCEPT 'free_text'"
+              ),
             unit: z
               .enum([
                 "g",
@@ -324,29 +354,53 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
                 "piece",
                 "free_text",
               ])
-              .describe("Unit of measurement"),
+              .describe(
+                "Unit of measurement (required). Use 'free_text' for measurements like 'a pinch' or 'to taste'"
+              ),
             quantityText: z
               .string()
               .optional()
-              .describe("Free text quantity (when unit is 'free_text')"),
-            note: z.string().optional().describe("Optional note"),
+              .describe(
+                "Free text quantity like 'a pinch' or 'to taste' (ONLY use when unit is 'free_text')"
+              ),
+            note: z
+              .string()
+              .optional()
+              .describe("Optional note like 'finely chopped' or 'room temperature'"),
           })
         )
-        .describe("List of ingredients with quantities"),
+        .min(1)
+        .describe("List of ingredients (required, must have at least 1)"),
       steps: z
         .array(
           z.object({
-            text: z.string().describe("Step description"),
+            text: z
+              .string()
+              .min(1)
+              .describe("Step description (required, non-empty)"),
             equipment: z
               .array(z.string())
               .optional()
-              .describe("Required equipment"),
+              .describe(
+                "Required equipment like ['oven', 'mixing bowl'] (optional)"
+              ),
           })
         )
-        .describe("Cooking steps"),
-      tags: z.array(z.string()).optional().describe("Recipe tags"),
-      categories: z.array(z.string()).optional().describe("Recipe categories"),
-      sourceUrl: z.string().optional().describe("Source URL"),
+        .min(1)
+        .describe("Cooking steps (required, must have at least 1)"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Recipe tags like ['vegan', 'spicy'] (optional)"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Recipe categories like ['dessert', 'norwegian'] (optional)"),
+      sourceUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe("Source URL (optional, must be valid URL if provided)"),
     }),
     handler: async ({
       name,
@@ -358,78 +412,199 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      const result = await api.createRecipe({
-        name,
-        description,
-        servings,
-        ingredients,
-        steps,
-        tags,
-        categories,
-        sourceUrl,
+      // Validate ingredient formatting
+      const errors: string[] = [];
+
+      ingredients.forEach((ing, index) => {
+        // Check if unit is free_text
+        if (ing.unit === "free_text") {
+          if (ing.quantity !== undefined) {
+            errors.push(
+              `Ingredient #${index + 1}: When unit is "free_text", do NOT provide quantity. Use quantityText instead. Example: {"ingredientId": "${ing.ingredientId}", "unit": "free_text", "quantityText": "a pinch"}`
+            );
+          }
+          if (!ing.quantityText) {
+            errors.push(
+              `Ingredient #${index + 1}: When unit is "free_text", quantityText is required. Example: {"ingredientId": "${ing.ingredientId}", "unit": "free_text", "quantityText": "to taste"}`
+            );
+          }
+        } else {
+          // Standard units
+          if (ing.quantity === undefined || ing.quantity === null) {
+            errors.push(
+              `Ingredient #${index + 1}: quantity is required when unit is "${ing.unit}". Example: {"ingredientId": "${ing.ingredientId}", "quantity": 200, "unit": "${ing.unit}"}`
+            );
+          }
+          if (ing.quantityText) {
+            errors.push(
+              `Ingredient #${index + 1}: quantityText should only be used with unit "free_text". Remove quantityText or change unit to "free_text".`
+            );
+          }
+        }
       });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Created recipe: ${result.name} (ID: ${result.id})`,
-          },
-        ],
-      };
+
+      if (errors.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `❌ VALIDATION ERRORS - Recipe creation failed:\n\n` +
+                errors.join("\n\n") +
+                `\n\n📋 FORMATTING GUIDE:\n` +
+                `Standard units: {"ingredientId": "abc123", "quantity": 200, "unit": "g"}\n` +
+                `Free text: {"ingredientId": "abc123", "unit": "free_text", "quantityText": "a pinch"}\n` +
+                `With note: {"ingredientId": "abc123", "quantity": 2, "unit": "cup", "note": "diced"}\n\n` +
+                `Valid units: g, kg, ml, l, oz, lb, tsp, tbsp, fl oz, cup, pint, quart, gallon, piece, free_text`,
+            },
+          ],
+        };
+      }
+
+      try {
+        const result = await api.createRecipe({
+          name,
+          description,
+          servings,
+          ingredients,
+          steps,
+          tags,
+          categories,
+          sourceUrl,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `✅ Created recipe: ${result.name} (ID: ${result.id})`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `❌ Failed to create recipe: ${error.message || error}\n\n` +
+                `Check that all ingredient IDs are valid and exist in the system.`,
+            },
+          ],
+        };
+      }
     },
   }),
 
   createMCPTool({
     name: "update_recipe",
-    description: "Update an existing recipe",
+    description: `Update an existing recipe. All fields except 'id' are optional - only provide fields you want to change.
+
+INGREDIENT FORMAT (same as create_recipe):
+- ingredientId: (required) string - Must be a valid ingredient ID from the system
+- unit: (required) Must be one of: "g", "kg", "ml", "l", "oz", "lb", "tsp", "tbsp", "fl oz", "cup", "pint", "quart", "gallon", "piece", or "free_text"
+- quantity: (optional) number - Required for all units EXCEPT "free_text". Example: 200 for "200g"
+- quantityText: (optional) string - ONLY used when unit is "free_text". Example: "a pinch" or "to taste"
+- note: (optional) string - Additional notes like "finely chopped"
+
+VALID EXAMPLES:
+1. Standard unit: {"ingredientId": "123", "quantity": 200, "unit": "g"}
+2. Free text: {"ingredientId": "456", "unit": "free_text", "quantityText": "a pinch"}
+3. With note: {"ingredientId": "789", "quantity": 2, "unit": "cup", "note": "finely chopped"}`,
     schema: z.object({
-      id: z.string().describe("The ID of the recipe to update"),
-      name: z.string().optional().describe("Updated name"),
-      description: z.string().optional().describe("Updated description"),
-      servings: z.number().optional().describe("Updated servings"),
+      id: z.string().min(1).describe("Recipe ID to update (required)"),
+      name: z.string().min(1).optional().describe("Updated recipe name"),
+      description: z.string().min(1).optional().describe("Updated description"),
+      servings: z
+        .number()
+        .positive()
+        .optional()
+        .describe("Updated servings (must be positive)"),
       ingredients: z
         .array(
           z.object({
-            ingredientId: z.string(),
-            quantity: z.number().optional(),
-            unit: z.enum([
-              "g",
-              "kg",
-              "ml",
-              "l",
-              "oz",
-              "lb",
-              "tsp",
-              "tbsp",
-              "fl oz",
-              "cup",
-              "pint",
-              "quart",
-              "gallon",
-              "piece",
-              "free_text",
-            ]),
-            quantityText: z.string().optional(),
-            note: z.string().optional(),
+            ingredientId: z
+              .string()
+              .min(1)
+              .describe("Ingredient ID (required, non-empty string)"),
+            quantity: z
+              .number()
+              .optional()
+              .describe(
+                "Quantity amount (number). Required for all units EXCEPT 'free_text'"
+              ),
+            unit: z
+              .enum([
+                "g",
+                "kg",
+                "ml",
+                "l",
+                "oz",
+                "lb",
+                "tsp",
+                "tbsp",
+                "fl oz",
+                "cup",
+                "pint",
+                "quart",
+                "gallon",
+                "piece",
+                "free_text",
+              ])
+              .describe(
+                "Unit of measurement (required). Use 'free_text' for measurements like 'a pinch' or 'to taste'"
+              ),
+            quantityText: z
+              .string()
+              .optional()
+              .describe(
+                "Free text quantity like 'a pinch' or 'to taste' (ONLY use when unit is 'free_text')"
+              ),
+            note: z
+              .string()
+              .optional()
+              .describe("Optional note like 'finely chopped' or 'room temperature'"),
           })
         )
+        .min(1)
         .optional()
-        .describe("Updated ingredients"),
+        .describe(
+          "Updated ingredients list (optional, replaces all ingredients if provided)"
+        ),
       steps: z
         .array(
           z.object({
-            text: z.string(),
-            equipment: z.array(z.string()).optional(),
+            text: z
+              .string()
+              .min(1)
+              .describe("Step description (required, non-empty)"),
+            equipment: z
+              .array(z.string())
+              .optional()
+              .describe(
+                "Required equipment like ['oven', 'mixing bowl'] (optional)"
+              ),
           })
         )
+        .min(1)
         .optional()
-        .describe("Updated steps"),
-      tags: z.array(z.string()).optional().describe("Updated tags"),
+        .describe(
+          "Updated cooking steps (optional, replaces all steps if provided)"
+        ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Updated tags (optional, replaces all tags if provided)"),
       categories: z
         .array(z.string())
         .optional()
-        .describe("Updated categories"),
-      sourceUrl: z.string().optional().describe("Updated source URL"),
+        .describe(
+          "Updated categories (optional, replaces all categories if provided)"
+        ),
+      sourceUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe("Updated source URL (optional, must be valid URL)"),
     }),
     handler: async ({
       id,
@@ -442,25 +617,89 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       categories,
       sourceUrl,
     }) => {
-      const updates: any = {};
-      if (name !== undefined) updates.name = name;
-      if (description !== undefined) updates.description = description;
-      if (servings !== undefined) updates.servings = servings;
-      if (ingredients !== undefined) updates.ingredients = ingredients;
-      if (steps !== undefined) updates.steps = steps;
-      if (tags !== undefined) updates.tags = tags;
-      if (categories !== undefined) updates.categories = categories;
-      if (sourceUrl !== undefined) updates.sourceUrl = sourceUrl;
+      // Validate ingredient formatting if ingredients are provided
+      const errors: string[] = [];
 
-      const result = await api.updateRecipe(id, updates);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Updated recipe: ${result.name} (ID: ${result.id})`,
-          },
-        ],
-      };
+      if (ingredients) {
+        ingredients.forEach((ing, index) => {
+          // Check if unit is free_text
+          if (ing.unit === "free_text") {
+            if (ing.quantity !== undefined) {
+              errors.push(
+                `Ingredient #${index + 1}: When unit is "free_text", do NOT provide quantity. Use quantityText instead. Example: {"ingredientId": "${ing.ingredientId}", "unit": "free_text", "quantityText": "a pinch"}`
+              );
+            }
+            if (!ing.quantityText) {
+              errors.push(
+                `Ingredient #${index + 1}: When unit is "free_text", quantityText is required. Example: {"ingredientId": "${ing.ingredientId}", "unit": "free_text", "quantityText": "to taste"}`
+              );
+            }
+          } else {
+            // Standard units
+            if (ing.quantity === undefined || ing.quantity === null) {
+              errors.push(
+                `Ingredient #${index + 1}: quantity is required when unit is "${ing.unit}". Example: {"ingredientId": "${ing.ingredientId}", "quantity": 200, "unit": "${ing.unit}"}`
+              );
+            }
+            if (ing.quantityText) {
+              errors.push(
+                `Ingredient #${index + 1}: quantityText should only be used with unit "free_text". Remove quantityText or change unit to "free_text".`
+              );
+            }
+          }
+        });
+      }
+
+      if (errors.length > 0) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `❌ VALIDATION ERRORS - Recipe update failed:\n\n` +
+                errors.join("\n\n") +
+                `\n\n📋 FORMATTING GUIDE:\n` +
+                `Standard units: {"ingredientId": "abc123", "quantity": 200, "unit": "g"}\n` +
+                `Free text: {"ingredientId": "abc123", "unit": "free_text", "quantityText": "a pinch"}\n` +
+                `With note: {"ingredientId": "abc123", "quantity": 2, "unit": "cup", "note": "diced"}\n\n` +
+                `Valid units: g, kg, ml, l, oz, lb, tsp, tbsp, fl oz, cup, pint, quart, gallon, piece, free_text`,
+            },
+          ],
+        };
+      }
+
+      try {
+        const updates: any = {};
+        if (name !== undefined) updates.name = name;
+        if (description !== undefined) updates.description = description;
+        if (servings !== undefined) updates.servings = servings;
+        if (ingredients !== undefined) updates.ingredients = ingredients;
+        if (steps !== undefined) updates.steps = steps;
+        if (tags !== undefined) updates.tags = tags;
+        if (categories !== undefined) updates.categories = categories;
+        if (sourceUrl !== undefined) updates.sourceUrl = sourceUrl;
+
+        const result = await api.updateRecipe(id, updates);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `✅ Updated recipe: ${result.name} (ID: ${result.id})`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `❌ Failed to update recipe: ${error.message || error}\n\n` +
+                `Check that the recipe ID exists and all ingredient IDs are valid.`,
+            },
+          ],
+        };
+      }
     },
   }),
 
