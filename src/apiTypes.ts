@@ -9,6 +9,12 @@ import {
   RecipeStep,
   Suggestion,
   GroupId,
+  NutritionalInfo,
+  UnitConversion,
+  Unit,
+  SuggestionCategory,
+  SuggestionPriority,
+  SuggestionStatus,
 } from "./types";
 
 // ----------------------
@@ -33,6 +39,10 @@ export interface CreateIngredientRequest {
   aliases?: string[];
   categories?: string[];
   allergens?: string[];
+  nutrition?: NutritionalInfo;
+  metadata?: Record<string, string>;
+  supportedUnits?: Unit[];
+  unitConversions?: UnitConversion[];
 }
 
 export interface CreateIngredientResponse extends Ingredient {
@@ -45,6 +55,10 @@ export interface UpdateIngredientRequest {
   aliases?: string[];
   categories?: string[];
   allergens?: string[];
+  nutrition?: NutritionalInfo;
+  metadata?: Record<string, string>;
+  supportedUnits?: Unit[];
+  unitConversions?: UnitConversion[];
 }
 
 export interface UpdateIngredientResponse extends Ingredient {
@@ -75,6 +89,22 @@ export interface DeleteIngredientRequest {
 
 export interface DeleteIngredientResponse {
   message: string;
+}
+
+export interface DuplicateIngredientRequest {
+  id: string;
+  name?: string;
+  aliases?: string[];
+  categories?: string[];
+  allergens?: string[];
+  nutrition?: NutritionalInfo;
+  metadata?: Record<string, string>;
+  supportedUnits?: Unit[];
+  unitConversions?: UnitConversion[];
+}
+
+export interface DuplicateIngredientResponse extends Ingredient {
+  id: string;
 }
 
 // ----------------------
@@ -138,6 +168,22 @@ export interface DeleteRecipeResponse {
   message: string;
 }
 
+export interface DuplicateRecipeRequest {
+  id: string;
+  name?: string;
+  description?: string;
+  servings?: number;
+  ingredients?: RecipeIngredient[];
+  steps?: RecipeStep[];
+  tags?: string[];
+  categories?: string[];
+  sourceUrl?: string;
+}
+
+export interface DuplicateRecipeResponse extends Recipe {
+  id: string;
+}
+
 // ----------------------
 // Search API Types
 // ----------------------
@@ -163,8 +209,8 @@ export interface SearchRecipesResponse {
 export interface CreateSuggestionRequest {
   title: string;
   description: string;
-  category?: "feature" | "bug" | "improvement" | "other";
-  priority?: "low" | "medium" | "high";
+  category?: SuggestionCategory;
+  priority?: SuggestionPriority;
   relatedRecipeId?: string;
 }
 
@@ -175,12 +221,7 @@ export interface CreateSuggestionResponse extends Suggestion {
 export interface ListSuggestionsRequest {
   limit?: number;
   offset?: number;
-  status?:
-    | "submitted"
-    | "under-review"
-    | "accepted"
-    | "rejected"
-    | "implemented";
+  status?: SuggestionStatus;
 }
 
 export interface ListSuggestionsResponse {
@@ -199,15 +240,36 @@ export interface VoteSuggestionResponse extends Suggestion {
 
 export interface UpdateSuggestionRequest {
   id: string;
-  status:
-    | "submitted"
-    | "under-review"
-    | "accepted"
-    | "rejected"
-    | "implemented";
+  title?: string;
+  description?: string;
+  category?: SuggestionCategory;
+  priority?: SuggestionPriority;
+  relatedRecipeId?: string;
+  status?: SuggestionStatus;
+}
+
+export interface DeleteSuggestionRequest {
+  id: string;
+}
+
+export interface DeleteSuggestionResponse {
+  message: string;
 }
 
 export interface UpdateSuggestionResponse extends Suggestion {
+  id: string;
+}
+
+export interface DuplicateSuggestionRequest {
+  id: string;
+  title?: string;
+  description?: string;
+  category?: SuggestionCategory;
+  priority?: SuggestionPriority;
+  relatedRecipeId?: string;
+}
+
+export interface DuplicateSuggestionResponse extends Suggestion {
   id: string;
 }
 
@@ -262,6 +324,12 @@ export interface ApiEndpoints {
     request?: ListIngredientsRequest;
     response: ListIngredientsResponse;
   };
+  ingredientsDuplicate: {
+    method: "POST";
+    path: "/ingredientsDuplicate";
+    request: DuplicateIngredientRequest;
+    response: DuplicateIngredientResponse;
+  };
 
   // Recipes
   recipesCreate: {
@@ -293,6 +361,12 @@ export interface ApiEndpoints {
     path: "/recipesList";
     request?: ListRecipesRequest;
     response: ListRecipesResponse;
+  };
+  recipesDuplicate: {
+    method: "POST";
+    path: "/recipesDuplicate";
+    request: DuplicateRecipeRequest;
+    response: DuplicateRecipeResponse;
   };
 
   // Search
@@ -327,6 +401,18 @@ export interface ApiEndpoints {
     path: "/suggestionsUpdate";
     request: UpdateSuggestionRequest;
     response: UpdateSuggestionResponse;
+  };
+  suggestionsDelete: {
+    method: "POST";
+    path: "/suggestionsDelete";
+    request: DeleteSuggestionRequest;
+    response: DeleteSuggestionResponse;
+  };
+  suggestionsDuplicate: {
+    method: "POST";
+    path: "/suggestionsDuplicate";
+    request: DuplicateSuggestionRequest;
+    response: DuplicateSuggestionResponse;
   };
 }
 
