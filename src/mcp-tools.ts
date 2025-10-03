@@ -10,18 +10,21 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the ingredient to retrieve"),
     }),
     handler: async ({ id }) => {
-      const result = await api.getIngredient(id);
+      const ingredient = await api.getIngredient(id);
       return {
         content: [
           {
             type: "text" as const,
             text:
-              `Ingredient: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Aliases: ${result.aliases.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Allergens: ${result.allergens.join(", ") || "None"}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
+              `Ingredient: ${ingredient.name}\n` +
+              `ID: ${ingredient.id}\n` +
+              `Aliases: ${ingredient.aliases?.join(", ") || "None"}\n` +
+              `Categories: ${ingredient.categories?.join(", ") || "None"}\n` +
+              `Allergens: ${ingredient.allergens?.join(", ") || "None"}\n` +
+              `Supported Units: ${ingredient.supportedUnits?.join(", ") || "None"}\n` +
+              `Created: ${ingredient.createdAt}\n` +
+              `Updated: ${ingredient.updatedAt}\n` +
+              `Created by Group: ${ingredient.createdByGroupId}`,
           },
         ],
       };
@@ -47,7 +50,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .map(
           (ing) =>
             `- ${ing.name} (${ing.id}) - Categories: ${
-              ing.categories.join(", ") || "None"
+              ing.categories?.join(", ") || "None"
             }`
         )
         .join("\n");
@@ -72,8 +75,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       id: z.string().describe("The ID of the recipe to retrieve"),
     }),
     handler: async ({ id }) => {
-      const result = await api.getRecipe(id);
-      const ingredientsList = result.ingredients
+      const recipe = await api.getRecipe(id);
+      const ingredientsList = recipe.ingredients
         .map((ing) => {
           const quantityText =
             ing.unit === "free_text"
@@ -84,7 +87,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           }`;
         })
         .join("\n");
-      const stepsList = result.steps
+      const stepsList = recipe.steps
         .map(
           (step, i) =>
             `${i + 1}. ${step.text}${
@@ -98,18 +101,19 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           {
             type: "text" as const,
             text:
-              `Recipe: ${result.name}\n` +
-              `ID: ${result.id}\n` +
-              `Slug: ${result.slug}\n` +
-              `Description: ${result.description}\n` +
-              `Servings: ${result.servings}\n` +
-              `Tags: ${result.tags.join(", ") || "None"}\n` +
-              `Categories: ${result.categories.join(", ") || "None"}\n` +
-              `Source URL: ${result.sourceUrl || "None"}\n` +
+              `Recipe: ${recipe.name}\n` +
+              `ID: ${recipe.id}\n` +
+              `Slug: ${recipe.slug}\n` +
+              `Description: ${recipe.description}\n` +
+              `Servings: ${recipe.servings}\n` +
+              `Tags: ${recipe.tags?.join(", ") || "None"}\n` +
+              `Categories: ${recipe.categories?.join(", ") || "None"}\n` +
+              `Source URL: ${recipe.sourceUrl || "None"}\n` +
               `Ingredients:\n${ingredientsList}\n\n` +
               `Steps:\n${stepsList}\n\n` +
-              `Updated: ${result.updatedAt}\n` +
-              `Created by Group: ${result.createdByGroupId}`,
+              `Created: ${recipe.createdAt}\n` +
+              `Updated: ${recipe.updatedAt}\n` +
+              `Created by Group: ${recipe.createdByGroupId}`,
           },
         ],
       };

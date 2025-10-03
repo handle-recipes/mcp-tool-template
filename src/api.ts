@@ -112,6 +112,21 @@ export class FirebaseFunctionsAPI {
     return response.data;
   }
 
+  async duplicateIngredient(
+    id: string,
+    request?: Omit<UpdateIngredientRequest, "id">
+  ): Promise<CreateIngredientResponse> {
+    const requestBody = { ...request, id };
+    const response = await this.client.post(
+      "/ingredientsDuplicate",
+      requestBody,
+      {
+        headers: this.getHeaders(),
+      }
+    );
+    return response.data;
+  }
+
   // ----------------------
   // Recipe API methods
   // ----------------------
@@ -162,6 +177,21 @@ export class FirebaseFunctionsAPI {
     const response = await this.client.post("/recipesList", params || {}, {
       headers: this.getHeaders(),
     });
+    return response.data;
+  }
+
+  async duplicateRecipe(
+    id: string,
+    request?: Omit<UpdateRecipeRequest, "id">
+  ): Promise<CreateRecipeResponse> {
+    const requestBody = { ...request, id };
+    const response = await this.client.post(
+      "/recipesDuplicate",
+      requestBody,
+      {
+        headers: this.getHeaders(),
+      }
+    );
     return response.data;
   }
 
@@ -223,6 +253,32 @@ export class FirebaseFunctionsAPI {
     const response = await this.client.post(
       "/suggestionsUpdate",
       requestWithId,
+      {
+        headers: this.getHeaders(),
+      }
+    );
+    return response.data;
+  }
+
+  async deleteSuggestion(id: string): Promise<{ message: string }> {
+    const response = await this.client.post(
+      "/suggestionsDelete",
+      { id },
+      {
+        headers: this.getHeaders(),
+      }
+    );
+    return response.data;
+  }
+
+  async duplicateSuggestion(
+    id: string,
+    request?: Omit<UpdateSuggestionRequest, "id">
+  ): Promise<CreateSuggestionResponse> {
+    const requestBody = { ...request, id };
+    const response = await this.client.post(
+      "/suggestionsDuplicate",
+      requestBody,
       {
         headers: this.getHeaders(),
       }
