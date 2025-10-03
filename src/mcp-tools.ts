@@ -210,4 +210,45 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       };
     },
   }),
+
+  createMCPTool({
+    name: "list_suggestions",
+    description: "List suggestions with optional pagination and status filtering",
+    schema: z.object({
+      limit: z
+        .number()
+        .optional()
+        .describe("Number of suggestions to return (default: 20)"),
+      offset: z
+        .number()
+        .optional()
+        .describe("Number of suggestions to skip for pagination (default: 0)"),
+      status: z
+        .enum(["submitted", "under-review", "accepted", "rejected", "implemented"])
+        .optional()
+        .describe("Filter by suggestion status"),
+    }),
+    handler: async ({ limit, offset, status }) => {
+      const result = await api.listSuggestions({ limit, offset, status });
+      const suggestionsList = result.suggestions
+        .map(
+          (suggestion) =>
+            `- [${suggestion.status.toUpperCase()}] ${suggestion.title} (${suggestion.id})\n` +
+            `  Category: ${suggestion.category} | Priority: ${suggestion.priority} | Votes: ${suggestion.votes}\n` +
+            `  ${suggestion.description.substring(0, 100)}${suggestion.description.length > 100 ? "..." : ""}`
+        )
+        .join("\n\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Found ${result.suggestions.length} suggestions${status ? ` with status "${status}"` : ""}:\n\n${suggestionsList}\n\n` +
+              `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
 ];
