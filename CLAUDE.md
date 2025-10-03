@@ -43,11 +43,15 @@ This is a **dual-mode Node.js TypeScript service** that operates both as a stand
 
 **API Client** (`src/api.ts`):
 - `FirebaseFunctionsAPI` class provides typed interface to Firebase Functions
-- Handles all CRUD operations for ingredients and recipes
+- Handles all CRUD operations for ingredients, recipes, and suggestions
 - Automatically includes x-group-id headers for multi-tenancy
+- Supports duplicate operations for creating variants
 
 **MCP Tools** (`src/mcp-tools.ts`):
-- Defines read-only MCP tools (get_ingredient, list_recipes, search_recipes, etc.)
+- Defines read-only MCP tools:
+  - Ingredients: `get_ingredient`, `list_ingredients`
+  - Recipes: `get_recipe`, `list_recipes`, `search_recipes`
+  - Suggestions: `list_suggestions`
 - Uses helper functions from `src/lib/mcp-tool-helper.ts` for registration
 - Extensible architecture for adding write operations
 
@@ -63,15 +67,31 @@ Optional:
 
 ## Key Files for Extension
 
-**For adding MCP write tools:**
+**For adding MCP tools:**
 - Edit `src/mcp-tools.ts` to add new tool definitions
-- Use existing `FirebaseFunctionsAPI` methods (createRecipe, updateIngredient, etc.)
-- Follow the pattern in MCP_TOOLS.md for implementation
+- Use the `createMCPTool` helper from `src/lib/mcp-tool-helper.ts`
+- Use existing `FirebaseFunctionsAPI` methods from `src/api.ts`
+- Check `src/api.ts` to see all available API endpoints and methods
+- **Complex tools can combine multiple API calls** - for example, a tool could:
+  - Get a recipe, then fetch full details for each ingredient
+  - Search recipes, then get nutritional summaries
+  - List ingredients and categorize them by allergens
+- Follow the pattern in MCP_TOOLS.md for implementation examples
 
 **For API modifications:**
 - Core API methods are in `src/api.ts`
 - Type definitions in `src/types.ts` and `src/apiTypes.ts`
 - Authentication logic in `src/lib/auth.ts`
+
+## Backend Type Definitions (DO NOT MODIFY)
+
+**IMPORTANT:** The following files represent backend types and API contracts. They should NEVER be modified as they must stay in sync with the Firebase Functions backend:
+
+- `API_DOCUMENTATION.md` - Complete API endpoint documentation from backend
+- `src/types.ts` - Shared domain models (Ingredient, Recipe, Suggestion, etc.)
+- `src/apiTypes.ts` - API request/response types and endpoint definitions
+
+If you need to update these files, the changes must come from the backend repository first. These files are copied from the backend to ensure type safety.
 
 ## Development Notes
 
