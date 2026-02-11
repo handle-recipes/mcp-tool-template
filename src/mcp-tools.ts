@@ -78,7 +78,9 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "list_ingredients",
-    description: "List all ingredients for the group with optional pagination",
+    description:
+      "List ingredients with optional filtering by categories, allergens, and name. " +
+      "Filters are applied client-side after fetching ingredients.",
     schema: z.object({
       limit: z
         .number()
@@ -88,25 +90,90 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .number()
         .optional()
         .describe("Number of ingredients to skip for pagination (default: 0)"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Filter by categories (e.g., ['dairy', 'protein', 'vegetable']). Matches ingredients with ANY of these categories."),
+      allergens: z
+        .array(z.string())
+        .optional()
+        .describe("Filter by allergens - only return ingredients that HAVE these allergens (e.g., ['gluten', 'nuts'])."),
+      allergenFree: z
+        .array(z.string())
+        .optional()
+        .describe("Exclude ingredients with these allergens (e.g., ['gluten', 'dairy'] to find gluten-free, dairy-free options)."),
+      nameSearch: z
+        .string()
+        .optional()
+        .describe("Filter by partial name match (case-insensitive). Also searches aliases."),
     }),
-    handler: async ({ limit, offset }) => {
-      const result = await api.listIngredients({ limit, offset });
-      const ingredientsList = result.ingredients
+    handler: async ({ limit, offset, categories, allergens, allergenFree, nameSearch }) => {
+      // Fetch more ingredients if filtering
+      const hasFilters = categories || allergens || allergenFree || nameSearch;
+      const fetchLimit = hasFilters ? 500 : limit;
+
+      const result = await api.listIngredients({ limit: fetchLimit, offset });
+      let ingredients = result.ingredients;
+
+      // Apply filters
+      if (categories && categories.length > 0) {
+        const lowerCategories = categories.map(c => c.toLowerCase());
+        ingredients = ingredients.filter(ing =>
+          ing.categories?.some(c => lowerCategories.includes(c.toLowerCase()))
+        );
+      }
+
+      if (allergens && allergens.length > 0) {
+        const lowerAllergens = allergens.map(a => a.toLowerCase());
+        ingredients = ingredients.filter(ing =>
+          ing.allergens?.some(a => lowerAllergens.includes(a.toLowerCase()))
+        );
+      }
+
+      if (allergenFree && allergenFree.length > 0) {
+        const lowerAllergenFree = allergenFree.map(a => a.toLowerCase());
+        ingredients = ingredients.filter(ing =>
+          !ing.allergens?.some(a => lowerAllergenFree.includes(a.toLowerCase()))
+        );
+      }
+
+      if (nameSearch) {
+        const searchLower = nameSearch.toLowerCase();
+        ingredients = ingredients.filter(ing =>
+          ing.name.toLowerCase().includes(searchLower) ||
+          ing.aliases?.some(alias => alias.toLowerCase().includes(searchLower))
+        );
+      }
+
+      // Apply limit after filtering
+      if (hasFilters && limit) {
+        ingredients = ingredients.slice(0, limit);
+      }
+
+      const ingredientsList = ingredients
         .map(
           (ing) =>
-            `- ${ing.name} (${ing.id}) - Categories: ${
-              ing.categories?.join(", ") || "None"
-            }`
+            `- ${ing.name} (${ing.id})` +
+            (ing.categories?.length ? ` - Categories: ${ing.categories.join(", ")}` : "") +
+            (ing.allergens?.length ? ` - Allergens: ${ing.allergens.join(", ")}` : "")
         )
         .join("\n");
+
+      // Build filter summary
+      const filterParts: string[] = [];
+      if (categories?.length) filterParts.push(`categories: ${categories.join(", ")}`);
+      if (allergens?.length) filterParts.push(`with allergens: ${allergens.join(", ")}`);
+      if (allergenFree?.length) filterParts.push(`without allergens: ${allergenFree.join(", ")}`);
+      if (nameSearch) filterParts.push(`name contains: "${nameSearch}"`);
+      const filterSummary = filterParts.length > 0 ? `Filters: ${filterParts.join(", ")}\n\n` : "";
 
       return {
         content: [
           {
             type: "text" as const,
             text:
-              `Found ${result.ingredients.length} ingredients:\n\n${ingredientsList}\n\n` +
-              `Has more results: ${result.hasMore}`,
+              `${filterSummary}Found ${ingredients.length} ingredients:\n\n${ingredientsList}\n\n` +
+              `Has more results: ${hasFilters ? "filtering applied" : result.hasMore}`,
           },
         ],
       };
@@ -167,7 +234,9 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "list_recipes",
-    description: "List all recipes for the group with optional pagination",
+    description:
+      "List recipes with optional filtering by tags, categories, ingredients, and servings. " +
+      "Filters are applied client-side after fetching recipes.",
     schema: z.object({
       limit: z
         .number()
@@ -177,23 +246,103 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .number()
         .optional()
         .describe("Number of recipes to skip for pagination (default: 0)"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Filter by tags (e.g., ['vegan', 'quick']). Matches recipes with ANY of these tags."),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Filter by categories (e.g., ['dessert', 'italian']). Matches recipes with ANY of these categories."),
+      ingredientIds: z
+        .array(z.string())
+        .optional()
+        .describe("Filter by ingredient IDs. Use with ingredientMatch to control matching behavior."),
+      ingredientMatch: z
+        .enum(["any", "all"])
+        .optional()
+        .describe("How to match ingredients: 'any' (default) = recipes with at least one ingredient, 'all' = recipes with ALL specified ingredients"),
+      minServings: z
+        .number()
+        .optional()
+        .describe("Minimum number of servings"),
+      maxServings: z
+        .number()
+        .optional()
+        .describe("Maximum number of servings"),
     }),
-    handler: async ({ limit, offset }) => {
-      const result = await api.listRecipes({ limit, offset });
-      const recipesList = result.recipes
+    handler: async ({ limit, offset, tags, categories, ingredientIds, ingredientMatch, minServings, maxServings }) => {
+      // Fetch more recipes if filtering, to ensure we have enough after filtering
+      const hasFilters = tags || categories || ingredientIds || minServings !== undefined || maxServings !== undefined;
+      const fetchLimit = hasFilters ? 200 : limit;
+
+      const result = await api.listRecipes({ limit: fetchLimit, offset });
+      let recipes = result.recipes;
+
+      // Apply filters
+      if (tags && tags.length > 0) {
+        const lowerTags = tags.map(t => t.toLowerCase());
+        recipes = recipes.filter(r =>
+          r.tags?.some(t => lowerTags.includes(t.toLowerCase()))
+        );
+      }
+
+      if (categories && categories.length > 0) {
+        const lowerCategories = categories.map(c => c.toLowerCase());
+        recipes = recipes.filter(r =>
+          r.categories?.some(c => lowerCategories.includes(c.toLowerCase()))
+        );
+      }
+
+      if (ingredientIds && ingredientIds.length > 0) {
+        const matchAll = ingredientMatch === "all";
+        recipes = recipes.filter(r => {
+          const recipeIngredientIds = r.ingredients.map(i => i.ingredientId);
+          if (matchAll) {
+            return ingredientIds.every(id => recipeIngredientIds.includes(id));
+          } else {
+            return ingredientIds.some(id => recipeIngredientIds.includes(id));
+          }
+        });
+      }
+
+      if (minServings !== undefined) {
+        recipes = recipes.filter(r => r.servings >= minServings);
+      }
+
+      if (maxServings !== undefined) {
+        recipes = recipes.filter(r => r.servings <= maxServings);
+      }
+
+      // Apply limit after filtering
+      if (hasFilters && limit) {
+        recipes = recipes.slice(0, limit);
+      }
+
+      const recipesList = recipes
         .map(
           (recipe) =>
-            `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
+            `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings` +
+            (recipe.tags?.length ? ` [${recipe.tags.join(", ")}]` : "")
         )
         .join("\n");
+
+      // Build filter summary
+      const filterParts: string[] = [];
+      if (tags?.length) filterParts.push(`tags: ${tags.join(", ")}`);
+      if (categories?.length) filterParts.push(`categories: ${categories.join(", ")}`);
+      if (ingredientIds?.length) filterParts.push(`ingredients (${ingredientMatch || "any"}): ${ingredientIds.length} IDs`);
+      if (minServings !== undefined) filterParts.push(`min servings: ${minServings}`);
+      if (maxServings !== undefined) filterParts.push(`max servings: ${maxServings}`);
+      const filterSummary = filterParts.length > 0 ? `Filters: ${filterParts.join(", ")}\n\n` : "";
 
       return {
         content: [
           {
             type: "text" as const,
             text:
-              `Found ${result.recipes.length} recipes:\n\n${recipesList}\n\n` +
-              `Has more results: ${result.hasMore}`,
+              `${filterSummary}Found ${recipes.length} recipes:\n\n${recipesList}\n\n` +
+              `Has more results: ${hasFilters ? "filtering applied" : result.hasMore}`,
           },
         ],
       };
@@ -259,7 +408,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
     name: "list_suggestions",
     description:
-      "List suggestions with optional pagination and status filtering",
+      "List suggestions with optional filtering by status, category, priority, and text search. " +
+      "Status filter uses the backend API; other filters are applied client-side.",
     schema: z.object({
       limit: z
         .number()
@@ -278,11 +428,59 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           "implemented",
         ])
         .optional()
-        .describe("Filter by suggestion status"),
+        .describe("Filter by suggestion status (uses backend API)"),
+      category: z
+        .enum(["feature", "bug", "improvement", "other"])
+        .optional()
+        .describe("Filter by suggestion category"),
+      priority: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Filter by priority level"),
+      textSearch: z
+        .string()
+        .optional()
+        .describe("Search in title and description (case-insensitive)"),
+      minVotes: z
+        .number()
+        .optional()
+        .describe("Minimum vote count"),
     }),
-    handler: async ({ limit, offset, status }) => {
-      const result = await api.listSuggestions({ limit, offset, status });
-      const suggestionsList = result.suggestions
+    handler: async ({ limit, offset, status, category, priority, textSearch, minVotes }) => {
+      // Fetch more suggestions if filtering client-side
+      const hasClientFilters = category || priority || textSearch || minVotes !== undefined;
+      const fetchLimit = hasClientFilters ? 100 : limit;
+
+      const result = await api.listSuggestions({ limit: fetchLimit, offset, status });
+      let suggestions = result.suggestions;
+
+      // Apply client-side filters
+      if (category) {
+        suggestions = suggestions.filter(s => s.category === category);
+      }
+
+      if (priority) {
+        suggestions = suggestions.filter(s => s.priority === priority);
+      }
+
+      if (textSearch) {
+        const searchLower = textSearch.toLowerCase();
+        suggestions = suggestions.filter(s =>
+          s.title.toLowerCase().includes(searchLower) ||
+          s.description.toLowerCase().includes(searchLower)
+        );
+      }
+
+      if (minVotes !== undefined) {
+        suggestions = suggestions.filter(s => s.votes >= minVotes);
+      }
+
+      // Apply limit after filtering
+      if (hasClientFilters && limit) {
+        suggestions = suggestions.slice(0, limit);
+      }
+
+      const suggestionsList = suggestions
         .map(
           (suggestion) =>
             `- [${suggestion.status.toUpperCase()}] ${suggestion.title} (${
@@ -295,15 +493,22 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         )
         .join("\n\n");
 
+      // Build filter summary
+      const filterParts: string[] = [];
+      if (status) filterParts.push(`status: ${status}`);
+      if (category) filterParts.push(`category: ${category}`);
+      if (priority) filterParts.push(`priority: ${priority}`);
+      if (textSearch) filterParts.push(`text contains: "${textSearch}"`);
+      if (minVotes !== undefined) filterParts.push(`min votes: ${minVotes}`);
+      const filterSummary = filterParts.length > 0 ? `Filters: ${filterParts.join(", ")}\n\n` : "";
+
       return {
         content: [
           {
             type: "text" as const,
             text:
-              `Found ${result.suggestions.length} suggestions${
-                status ? ` with status "${status}"` : ""
-              }:\n\n${suggestionsList}\n\n` +
-              `Has more results: ${result.hasMore}`,
+              `${filterSummary}Found ${suggestions.length} suggestions:\n\n${suggestionsList}\n\n` +
+              `Has more results: ${hasClientFilters ? "filtering applied" : result.hasMore}`,
           },
         ],
       };
