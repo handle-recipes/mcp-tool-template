@@ -51,7 +51,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           (ing) =>
             `- ${ing.name} (${ing.id}) - Categories: ${
               ing.categories?.join(", ") || "None"
-            }`
+            }`,
         )
         .join("\n");
 
@@ -92,7 +92,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           (step, i) =>
             `${i + 1}. ${step.text}${
               step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
-            }`
+            }`,
         )
         .join("\n");
 
@@ -138,7 +138,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       const recipesList = result.recipes
         .map(
           (recipe) =>
-            `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`
+            `- ${recipe.name} (${recipe.id}) - ${recipe.servings} servings`,
         )
         .join("\n");
 
@@ -193,8 +193,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           (recipe) =>
             `- ${recipe.name} (${recipe.id}) - ${recipe.description.substring(
               0,
-              100
-            )}...`
+              100,
+            )}...`,
         )
         .join("\n");
 
@@ -213,7 +213,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "list_suggestions",
-    description: "List suggestions with optional pagination and status filtering",
+    description:
+      "List suggestions with optional pagination and status filtering",
     schema: z.object({
       limit: z
         .number()
@@ -224,7 +225,13 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .optional()
         .describe("Number of suggestions to skip for pagination (default: 0)"),
       status: z
-        .enum(["submitted", "under-review", "accepted", "rejected", "implemented"])
+        .enum([
+          "submitted",
+          "under-review",
+          "accepted",
+          "rejected",
+          "implemented",
+        ])
         .optional()
         .describe("Filter by suggestion status"),
     }),
@@ -235,7 +242,7 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           (suggestion) =>
             `- [${suggestion.status.toUpperCase()}] ${suggestion.title} (${suggestion.id})\n` +
             `  Category: ${suggestion.category} | Priority: ${suggestion.priority} | Votes: ${suggestion.votes}\n` +
-            `  ${suggestion.description.substring(0, 100)}${suggestion.description.length > 100 ? "..." : ""}`
+            `  ${suggestion.description.substring(0, 100)}${suggestion.description.length > 100 ? "..." : ""}`,
         )
         .join("\n\n");
 
@@ -246,6 +253,117 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Found ${result.suggestions.length} suggestions${status ? ` with status "${status}"` : ""}:\n\n${suggestionsList}\n\n` +
               `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "add_recipe",
+    description: "Create a new recipe for the group",
+    schema: z.object({
+      name: z.string().describe("Recipe name"),
+      description: z.string().optional().describe("Short description"),
+      servings: z.number().optional().describe("Number of servings"),
+      tags: z.array(z.string()).optional().describe("Tags for the recipe"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Categories for the recipe"),
+      slug: z.string().optional().describe("Optional slug"),
+      sourceUrl: z.string().optional().describe("Source URL"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string(),
+            quantity: z.number().optional(),
+            unit: z.string().optional(),
+            quantityText: z.string().optional(),
+            note: z.string().optional(),
+          }),
+        )
+        .optional()
+        .describe("Array of ingredients"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string(),
+            equipment: z.array(z.string()).optional(),
+          }),
+        )
+        .optional()
+        .describe("Array of step objects"),
+    }),
+    handler: async (params) => {
+      const requestBody = {
+        name: params.name,
+        description: params.description,
+        servings: params.servings,
+        tags: params.tags,
+        categories: params.categories,
+        slug: params.slug,
+        sourceUrl: params.sourceUrl,
+        ingredients: params.ingredients,
+        steps: params.steps,
+      } as any;
+
+      const created = await api.createRecipe(requestBody);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Created recipe ${created.id} - ${created.name || params.name}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "export_hackathon",
+    description: "Export selected recipes as JSON bundle for hackathon/backup",
+    schema: z.object({
+      ids: z
+        .array(z.string())
+        .optional()
+        .describe("Optional list of recipe IDs to export"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Optional limit for listing recipes"),
+      offset: z
+        .number()
+        .optional()
+        .describe("Optional offset for listing recipes"),
+    }),
+    handler: async ({ ids, limit, offset }) => {
+      let recipes: any[] = [];
+      if (ids && ids.length > 0) {
+        for (const id of ids) {
+          try {
+            const r = await api.getRecipe(id);
+            recipes.push(r);
+          } catch (err) {
+            // skip missing
+          }
+        }
+      } else {
+        const res = await api.listRecipes({ limit, offset } as any);
+        recipes = res.recipes || [];
+      }
+
+      const bundle = {
+        exportedAt: new Date().toISOString(),
+        count: recipes.length,
+        recipes,
+      };
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(bundle, null, 2),
           },
         ],
       };
