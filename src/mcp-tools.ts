@@ -212,6 +212,52 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   }),
 
   createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe for the group",
+    schema: z.object({
+      name: z.string().describe("Recipe name"),
+      slug: z.string().optional().describe("Optional URL slug"),
+      description: z.string().optional().describe("Recipe description"),
+      servings: z.number().optional().describe("Number of servings"),
+      tags: z.array(z.string()).optional().describe("Tags for the recipe"),
+      categories: z.array(z.string()).optional().describe("Categories for the recipe"),
+      sourceUrl: z.string().optional().describe("Optional source URL"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string().describe("Ingredient ID"),
+            quantity: z.number().optional().describe("Numeric quantity"),
+            unit: z.string().describe("Unit (or 'free_text')"),
+            quantityText: z.string().optional().describe("Free-text quantity"),
+            note: z.string().optional().describe("Optional note for ingredient"),
+          })
+        )
+        .optional()
+        .describe("List of ingredients"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string().describe("Step instruction text"),
+            equipment: z.array(z.string()).optional().describe("Optional equipment list"),
+          })
+        )
+        .optional()
+        .describe("Ordered list of steps"),
+    }),
+    handler: async (request) => {
+      const created = await api.createRecipe(request as any);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Created recipe: ${created.name} (ID: ${created.id})`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
     name: "list_suggestions",
     description: "List suggestions with optional pagination and status filtering",
     schema: z.object({
