@@ -20,16 +20,23 @@ RUN npm ci && \
 
 # Copy TypeScript configuration
 COPY tsconfig.json ./
+COPY tsconfig.app.json ./
+
+# Copy Vite configuration
+COPY vite.config.ts ./
 
 # Copy source code
 COPY src/ ./src/
 
-# Build TypeScript to JavaScript
+# Copy app source for Vite build
+COPY app/ ./app/
+
+# Build TypeScript to JavaScript, then bundle the MCP App HTML
 RUN npm run build
 
 # Remove development dependencies and source files to reduce image size
 RUN npm prune --production && \
-  rm -rf src/ tsconfig.json
+  rm -rf src/ app/ tsconfig.json tsconfig.app.json vite.config.ts
 
 # Change ownership of the app directory to the nodejs user
 RUN chown -R recipes:nodejs /app

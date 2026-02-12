@@ -1,13 +1,21 @@
 #!/usr/bin/env node
 
+import * as fs from "fs";
+import * as path from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
+import { z } from "zod";
 import { GoogleAuthClient } from "./lib/auth";
 import { FirebaseFunctionsAPI } from "./api";
 import { GroupId } from "./types";
 import { registerTools } from "./lib/mcp-tool-helper";
 import { createRecipeTools } from "./mcp-tools";
+
+// MCP App constants (inlined to avoid ESM-only @modelcontextprotocol/ext-apps/server import)
+const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
+const RESOURCE_URI_META_KEY = "ui/resourceUri";
+const RECIPE_VIEWER_URI = "ui://recipe-viewer/recipe-viewer.html";
 
 interface MCPConfig {
   functionBaseUrl: string;
@@ -45,6 +53,7 @@ const getServer = () => {
     {
       capabilities: {
         tools: {},
+        resources: {},
       },
     }
   );
@@ -69,6 +78,58 @@ const getServer = () => {
     const apiInstance = await initializeAPI();
     const tools = createRecipeTools(apiInstance);
     registerTools(server, tools);
+
+    // Register view_recipe tool with MCP App UI metadata.
+    // We use the low-level server.server.setRequestHandler approach is too
+    // complex -- instead we register via tool() but split the schema to avoid
+    // the "Type instantiation is excessively deep" TS error that occurs when
+    // zod generics interact with the overloaded server.tool() signatures.
+    const viewRecipeSchema = { id: z.string().describe("The ID of the recipe to view") };
+    const viewRecipeHandler = async ({ id }: { id: string }) => {
+      const recipe = await apiInstance.getRecipe(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(recipe),
+          },
+        ],
+        _meta: {
+          ui: {
+            resourceUri: RECIPE_VIEWER_URI,
+          },
+          [RESOURCE_URI_META_KEY]: RECIPE_VIEWER_URI,
+        },
+      };
+    };
+    (server as any).tool(
+      "view_recipe",
+      "View a recipe with a rich interactive UI card. Returns recipe data as JSON for the MCP App to render.",
+      viewRecipeSchema,
+      viewRecipeHandler
+    );
+  };
+
+  // Register the recipe viewer HTML resource
+  const setupResources = () => {
+    server.resource(
+      "recipe-viewer",
+      RECIPE_VIEWER_URI,
+      { description: "Interactive recipe viewer app", mimeType: RESOURCE_MIME_TYPE },
+      async () => {
+        const htmlPath = path.join(__dirname, "app", "recipe-viewer.html");
+        const html = fs.readFileSync(htmlPath, "utf-8");
+        return {
+          contents: [
+            {
+              uri: RECIPE_VIEWER_URI,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: html,
+            },
+          ],
+        };
+      }
+    );
   };
 
   // Initialize tools on first request
@@ -76,6 +137,7 @@ const getServer = () => {
   const ensureToolsInitialized = async () => {
     if (!toolsInitialized) {
       await setupTools();
+      setupResources();
       toolsInitialized = true;
     }
   };
@@ -92,7 +154,7 @@ app.post("/mcp", async (req, res) => {
   try {
     // Ensure tools are initialized before handling the request
     await ensureToolsInitialized();
-    
+
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });

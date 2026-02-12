@@ -1,0 +1,15 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-base, system-ui, -apple-system, sans-serif);
+  color: var(--color-text-primary, #1a1a1a);
+  background: var(--color-background-primary, #ffffff);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

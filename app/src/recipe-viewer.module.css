@@ -1,0 +1,145 @@
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  color: var(--color-text-secondary, #666);
+  font-size: 0.95rem;
+}
+
+.error {
+  color: var(--color-danger, #dc3545);
+}
+
+.header {
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-bottom: 0.25rem;
+}
+
+.description {
+  color: var(--color-text-secondary, #666);
+  font-size: 0.95rem;
+}
+
+.meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.metaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--color-background-secondary, #f0f0f0);
+  color: var(--color-text-secondary, #666);
+}
+
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.sectionTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #666);
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  padding-bottom: 0.35rem;
+}
+
+.ingredientList {
+  list-style: none;
+}
+
+.ingredientItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--color-border-light, #f0f0f0);
+  font-size: 0.9rem;
+}
+
+.ingredientItem:last-child {
+  border-bottom: none;
+}
+
+.ingredientName {
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.ingredientQty {
+  color: var(--color-text-secondary, #666);
+  white-space: nowrap;
+  margin-left: 1rem;
+}
+
+.ingredientNote {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary, #999);
+  font-style: italic;
+}
+
+.stepList {
+  list-style: none;
+  counter-reset: steps;
+}
+
+.stepItem {
+  counter-increment: steps;
+  position: relative;
+  padding: 0.5rem 0 0.5rem 2.25rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.stepItem::before {
+  content: counter(steps);
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--color-accent, #4a90d9);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  background: var(--color-background-secondary, #f0f0f0);
+  color: var(--color-text-secondary, #666);
+}
