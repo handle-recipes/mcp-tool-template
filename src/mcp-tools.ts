@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import PDFDocument from "pdfkit";
+import { PassThrough } from "stream";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -353,17 +355,89 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         recipes = res.recipes || [];
       }
 
-      const bundle = {
-        exportedAt: new Date().toISOString(),
-        count: recipes.length,
-        recipes,
-      };
+      // Generate a PDF bundle from recipes and return as base64 data URL
+      const pdfBase64 = await (async function generatePdf(recipesArr: any[]) {
+        return new Promise<string>((resolve, reject) => {
+          try {
+            const doc = new PDFDocument({ autoFirstPage: false });
+            const pass = new PassThrough();
+            const chunks: Buffer[] = [];
+            doc.pipe(pass);
+            pass.on("data", (chunk: Buffer) => chunks.push(chunk));
+            pass.on("end", () => {
+              const buf = Buffer.concat(chunks);
+              resolve(buf.toString("base64"));
+            });
+            pass.on("error", (err) => reject(err));
+
+            if (recipesArr.length === 0) {
+              doc.addPage();
+              doc
+                .fontSize(14)
+                .text("No recipes to export", { align: "center" });
+            }
+
+            for (const r of recipesArr) {
+              doc.addPage({ margin: 40 });
+              doc
+                .fontSize(16)
+                .text(r.name || "Unnamed recipe", { underline: true });
+              doc.moveDown(0.5);
+              doc.fontSize(10).text(`ID: ${r.id || "N/A"}`);
+              if (r.servings) doc.text(`Servings: ${r.servings}`);
+              if (r.tags && r.tags.length)
+                doc.text(`Tags: ${r.tags.join(", ")}`);
+              doc.moveDown(0.5);
+
+              if (r.description) {
+                doc.fontSize(12).text("Description:");
+                doc.fontSize(10).text(r.description);
+                doc.moveDown(0.5);
+              }
+
+              doc.fontSize(12).text("Ingredients:");
+              doc.fontSize(10);
+              if (r.ingredients && r.ingredients.length) {
+                for (const ing of r.ingredients) {
+                  const quantityText =
+                    ing.unit === "free_text"
+                      ? ing.quantityText || ""
+                      : `${ing.quantity ?? ""} ${ing.unit ?? ""}`;
+                  doc.text(
+                    `- ${quantityText} (Ingredient ID: ${ing.ingredientId || ing.id || ""})${ing.note ? ` — ${ing.note}` : ""}`,
+                  );
+                }
+              } else {
+                doc.text("- None");
+              }
+
+              doc.moveDown(0.5);
+              doc.fontSize(12).text("Steps:");
+              doc.fontSize(10);
+              if (r.steps && r.steps.length) {
+                for (let i = 0; i < r.steps.length; i++) {
+                  const step = r.steps[i];
+                  doc.text(`${i + 1}. ${step.text}`);
+                }
+              } else {
+                doc.text("- None");
+              }
+            }
+
+            doc.end();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      })(recipes);
+
+      const dataUrl = `data:application/pdf;base64,${pdfBase64}`;
 
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(bundle, null, 2),
+            text: dataUrl,
           },
         ],
       };
