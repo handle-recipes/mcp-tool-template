@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import { UNIT } from "./types";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -246,6 +247,129 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Found ${result.suggestions.length} suggestions${status ? ` with status "${status}"` : ""}:\n\n${suggestionsList}\n\n` +
               `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe with ingredients and steps",
+    schema: z.object({
+      name: z.string().describe("Name of the recipe"),
+      description: z.string().describe("Description of the recipe"),
+      servings: z
+        .number()
+        .min(1)
+        .describe("Number of servings (minimum 1)"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z
+              .string()
+              .describe("ID of the ingredient"),
+            unit: z
+              .enum(UNIT)
+              .describe("Unit of measurement"),
+            quantity: z
+              .number()
+              .optional()
+              .describe("Numeric quantity (omit if unit is free_text)"),
+            quantityText: z
+              .string()
+              .optional()
+              .describe(
+                "Text quantity, used when unit is free_text (e.g. 'a pinch', 'to taste')"
+              ),
+            note: z
+              .string()
+              .optional()
+              .describe("Optional note (e.g. 'finely chopped')"),
+          })
+        )
+        .describe("List of ingredients for the recipe"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string().describe("Instruction text for this step"),
+            imageUrl: z
+              .string()
+              .optional()
+              .describe("Optional image URL for this step"),
+            equipment: z
+              .array(z.string())
+              .optional()
+              .describe("Optional equipment needed for this step"),
+          })
+        )
+        .describe("Ordered list of recipe steps"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Optional tags (e.g. 'vegan', 'spicy')"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Optional categories (e.g. 'dessert', 'norwegian')"),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe("Optional source attribution URL"),
+    }),
+    handler: async ({
+      name,
+      description,
+      servings,
+      ingredients,
+      steps,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const recipe = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+
+      const ingredientsList = recipe.ingredients
+        .map((ing) => {
+          const quantityText =
+            ing.unit === "free_text"
+              ? ing.quantityText
+              : `${ing.quantity || ""} ${ing.unit}`;
+          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
+            ing.note ? ` - ${ing.note}` : ""
+          }`;
+        })
+        .join("\n");
+      const stepsList = recipe.steps
+        .map(
+          (step, i) =>
+            `${i + 1}. ${step.text}${
+              step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
+            }`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Created recipe successfully!\n\n` +
+              `Name: ${recipe.name}\n` +
+              `ID: ${recipe.id}\n` +
+              `Slug: ${recipe.slug}\n` +
+              `Servings: ${recipe.servings}\n` +
+              `Ingredients (${recipe.ingredients.length}):\n${ingredientsList}\n\n` +
+              `Steps (${recipe.steps.length}):\n${stepsList}`,
           },
         ],
       };
