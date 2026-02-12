@@ -59,6 +59,15 @@ export interface UpdateIngredientRequest {
   metadata?: Record<string, string>;
   supportedUnits?: Unit[];
   unitConversions?: UnitConversion[];
+  // Array operations (cannot be used alongside their full replacement counterpart)
+  addAliases?: string[];
+  removeAliases?: string[];
+  addCategories?: string[];
+  removeCategories?: string[];
+  addAllergens?: string[];
+  removeAllergens?: string[];
+  addSupportedUnits?: Unit[];
+  removeSupportedUnits?: Unit[];
 }
 
 export interface UpdateIngredientResponse extends Ingredient {
@@ -136,6 +145,15 @@ export interface UpdateRecipeRequest {
   tags?: string[];
   categories?: string[];
   sourceUrl?: string;
+  // Array operations (cannot be used alongside their full replacement counterpart)
+  addTags?: string[];
+  removeTags?: string[];
+  addCategories?: string[];
+  removeCategories?: string[];
+  addIngredients?: RecipeIngredient[];
+  removeIngredientIds?: string[];
+  addSteps?: RecipeStep[];
+  removeStepIndexes?: number[];
 }
 
 export interface UpdateRecipeResponse extends Recipe {
@@ -469,14 +487,14 @@ export function isApiError(obj: unknown): obj is ApiError {
 }
 
 export function hasRequestBody<T extends EndpointName>(
-  endpoint: T
+  endpoint: T,
 ): endpoint is T & { request: EndpointRequest<T> } {
   // All endpoints now use POST with request bodies
   return true;
 }
 
 export function hasUrlParams<T extends EndpointName>(
-  endpoint: T
+  endpoint: T,
 ): endpoint is T & { params: EndpointParams<T> } {
   // No endpoints use URL params anymore - all data is in request body
   return false;
