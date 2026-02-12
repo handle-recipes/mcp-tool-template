@@ -212,6 +212,119 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   }),
 
   createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe",
+    schema: z.object({
+      name: z.string().describe("Recipe name"),
+      description: z.string().describe("Recipe description"),
+      servings: z.number().describe("Number of servings"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string(),
+            quantity: z.number().optional(),
+            unit: z.enum([
+              "g",
+              "kg",
+              "ml",
+              "l",
+              "oz",
+              "lb",
+              "tsp",
+              "tbsp",
+              "fl oz",
+              "cup",
+              "pint",
+              "quart",
+              "gallon",
+              "piece",
+              "free_text",
+            ]),
+            quantityText: z.string().optional(),
+            note: z.string().optional(),
+          })
+        )
+        .describe("List of ingredients with quantities"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string(),
+            imageUrl: z.string().optional(),
+            equipment: z.array(z.string()).optional(),
+          })
+        )
+        .describe("Recipe steps in order"),
+      tags: z.array(z.string()).optional().describe("Recipe tags"),
+      categories: z.array(z.string()).optional().describe("Recipe categories"),
+      sourceUrl: z.string().optional().describe("Source URL for attribution"),
+    }),
+    handler: async ({
+      name,
+      description,
+      servings,
+      ingredients,
+      steps,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const recipe = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+
+      const ingredientsList = recipe.ingredients
+        .map((ing) => {
+          const quantityText =
+            ing.unit === "free_text"
+              ? ing.quantityText
+              : `${ing.quantity || ""} ${ing.unit}`;
+          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
+            ing.note ? ` - ${ing.note}` : ""
+          }`;
+        })
+        .join("\n");
+
+      const stepsList = recipe.steps
+        .map(
+          (step, i) =>
+            `${i + 1}. ${step.text}${
+              step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
+            }`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `✅ Recipe created successfully!\n\n` +
+              `Recipe: ${recipe.name}\n` +
+              `ID: ${recipe.id}\n` +
+              `Slug: ${recipe.slug}\n` +
+              `Description: ${recipe.description}\n` +
+              `Servings: ${recipe.servings}\n` +
+              `Tags: ${recipe.tags?.join(", ") || "None"}\n` +
+              `Categories: ${recipe.categories?.join(", ") || "None"}\n` +
+              `Source URL: ${recipe.sourceUrl || "None"}\n\n` +
+              `Ingredients:\n${ingredientsList}\n\n` +
+              `Steps:\n${stepsList}\n\n` +
+              `Created: ${recipe.createdAt}\n` +
+              `Created by Group: ${recipe.createdByGroupId}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
     name: "list_suggestions",
     description: "List suggestions with optional pagination and status filtering",
     schema: z.object({
