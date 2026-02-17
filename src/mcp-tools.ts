@@ -1,6 +1,33 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import { UNIT } from "./types";
+
+const unitEnum = z.enum(UNIT as [string, ...string[]] as [typeof UNIT[number], ...typeof UNIT[number][]]);
+
+const recipeIngredientSchema = z.object({
+  ingredientId: z.string().describe("ID of the ingredient"),
+  unit: unitEnum.describe(
+    'Unit for the quantity (use "free_text" for freeform amounts like "a pinch")'
+  ),
+  quantity: z
+    .number()
+    .optional()
+    .describe('Numeric quantity (omit when unit is "free_text")'),
+  quantityText: z
+    .string()
+    .optional()
+    .describe('Freeform quantity text, required when unit is "free_text"'),
+  note: z.string().optional().describe('Optional note, e.g. "finely chopped"'),
+});
+
+const recipeStepSchema = z.object({
+  text: z.string().describe("Instruction text for this step"),
+  equipment: z
+    .array(z.string())
+    .optional()
+    .describe("Optional list of equipment needed for this step"),
+});
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -205,6 +232,70 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Search results for "${result.query}":\n` +
               `Total found: ${result.totalFound}\n\n${recipesList}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe",
+    schema: z.object({
+      name: z.string().describe("Recipe name"),
+      description: z.string().describe("Recipe description"),
+      servings: z.number().describe("Number of servings"),
+      ingredients: z
+        .array(recipeIngredientSchema)
+        .describe("List of ingredients with quantities"),
+      steps: z
+        .array(recipeStepSchema)
+        .describe("Ordered list of preparation steps"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Free-text tags, e.g. ["vegan", "spicy"]'),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe('Free-text categories, e.g. ["dessert", "norwegian"]'),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe("Optional source attribution URL"),
+    }),
+    handler: async ({
+      name,
+      description,
+      servings,
+      ingredients,
+      steps,
+      tags,
+      categories,
+      sourceUrl,
+    }) => {
+      const recipe = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Recipe created successfully!\n` +
+              `ID: ${recipe.id}\n` +
+              `Name: ${recipe.name}\n` +
+              `Slug: ${recipe.slug}\n` +
+              `Servings: ${recipe.servings}\n` +
+              `Ingredients: ${recipe.ingredients.length}\n` +
+              `Steps: ${recipe.steps.length}`,
           },
         ],
       };
