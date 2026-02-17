@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
-import PDFDocument from "pdfkit";
-import { PassThrough } from "stream";
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -67,6 +65,63 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
           },
         ],
       };
+    },
+  }),
+
+  createMCPTool({
+    name: "add_ingredient",
+    description: "Create a new ingredient for the group",
+    schema: z.object({
+      name: z.string().describe("Name of the ingredient"),
+      aliases: z
+        .array(z.string())
+        .optional()
+        .describe("Alternative names for the ingredient"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Categories (e.g., 'dairy', 'protein', 'herb')"),
+      allergens: z
+        .array(z.string())
+        .optional()
+        .describe("Allergen tags (e.g., 'nuts', 'gluten', 'milk')"),
+      supportedUnits: z
+        .array(z.string())
+        .optional()
+        .describe("Supported units (e.g., 'g', 'ml', 'piece')"),
+    }),
+    handler: async (params) => {
+      try {
+        const ingredient = await api.createIngredient({
+          name: params.name,
+          aliases: params.aliases,
+          categories: params.categories,
+          allergens: params.allergens,
+          supportedUnits: params.supportedUnits as any,
+        });
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                `Created ingredient: ${ingredient.name}\n` +
+                `ID: ${ingredient.id}\n` +
+                (ingredient.aliases?.length
+                  ? `Aliases: ${ingredient.aliases.join(", ")}\n`
+                  : "") +
+                (ingredient.categories?.length
+                  ? `Categories: ${ingredient.categories.join(", ")}\n`
+                  : "") +
+                (ingredient.allergens?.length
+                  ? `Allergens: ${ingredient.allergens.join(", ")}\n`
+                  : ""),
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(`Failed to create ingredient: ${error}`);
+      }
     },
   }),
 
@@ -263,7 +318,8 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
 
   createMCPTool({
     name: "add_recipe",
-    description: "Create a new recipe for the group",
+    description:
+      "Create a new recipe for the group. Can also create missing ingredients in the same request.",
     schema: z.object({
       name: z.string().describe("Recipe name"),
       description: z.string().optional().describe("Short description"),
@@ -277,16 +333,43 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
       sourceUrl: z.string().optional().describe("Source URL"),
       ingredients: z
         .array(
-          z.object({
-            ingredientId: z.string(),
-            quantity: z.number().optional(),
-            unit: z.string().optional(),
-            quantityText: z.string().optional(),
-            note: z.string().optional(),
-          }),
+          z.union([
+            // Option 1: Reference existing ingredient by ID
+            z.object({
+              ingredientId: z.string().describe("ID of existing ingredient"),
+              quantity: z.number().optional(),
+              unit: z.string().optional(),
+              quantityText: z.string().optional(),
+              note: z.string().optional(),
+            }),
+            // Option 2: Create new ingredient inline
+            z.object({
+              ingredientName: z
+                .string()
+                .describe("Name of ingredient to create"),
+              quantity: z.number().optional(),
+              unit: z.string().optional(),
+              quantityText: z.string().optional(),
+              note: z.string().optional(),
+              aliases: z
+                .array(z.string())
+                .optional()
+                .describe("Ingredient aliases"),
+              categories: z
+                .array(z.string())
+                .optional()
+                .describe("Ingredient categories"),
+              allergens: z
+                .array(z.string())
+                .optional()
+                .describe("Ingredient allergens"),
+            }),
+          ]),
         )
         .optional()
-        .describe("Array of ingredients"),
+        .describe(
+          "Array of ingredients - can use ingredientId for existing or ingredientName to create new",
+        ),
       steps: z
         .array(
           z.object({
@@ -298,6 +381,50 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         .describe("Array of step objects"),
     }),
     handler: async (params) => {
+      // Process ingredients: create new ones if needed and collect IDs
+      const processedIngredients: typeof params.ingredients = [];
+      const createdIngredients: string[] = [];
+
+      if (params.ingredients && params.ingredients.length > 0) {
+        for (const ing of params.ingredients) {
+          const ingredientItem = ing as any;
+
+          if ("ingredientName" in ingredientItem) {
+            // Create new ingredient
+            try {
+              const newIngredient = await api.createIngredient({
+                name: ingredientItem.ingredientName,
+                aliases: ingredientItem.aliases,
+                categories: ingredientItem.categories,
+                allergens: ingredientItem.allergens,
+              });
+              createdIngredients.push(newIngredient.id);
+
+              processedIngredients.push({
+                ingredientId: newIngredient.id,
+                quantity: ingredientItem.quantity,
+                unit: ingredientItem.unit,
+                quantityText: ingredientItem.quantityText,
+                note: ingredientItem.note,
+              });
+            } catch (error) {
+              throw new Error(
+                `Failed to create ingredient "${ingredientItem.ingredientName}": ${error}`,
+              );
+            }
+          } else {
+            // Use existing ingredient ID
+            processedIngredients.push({
+              ingredientId: ingredientItem.ingredientId,
+              quantity: ingredientItem.quantity,
+              unit: ingredientItem.unit,
+              quantityText: ingredientItem.quantityText,
+              note: ingredientItem.note,
+            });
+          }
+        }
+      }
+
       const requestBody = {
         name: params.name,
         description: params.description,
@@ -306,138 +433,25 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
         categories: params.categories,
         slug: params.slug,
         sourceUrl: params.sourceUrl,
-        ingredients: params.ingredients,
+        ingredients: processedIngredients,
         steps: params.steps,
       } as any;
 
       const created = await api.createRecipe(requestBody);
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Created recipe ${created.id} - ${created.name || params.name}`,
-          },
-        ],
-      };
-    },
-  }),
 
-  createMCPTool({
-    name: "export_hackathon",
-    description: "Export selected recipes as JSON bundle for hackathon/backup",
-    schema: z.object({
-      ids: z
-        .array(z.string())
-        .optional()
-        .describe("Optional list of recipe IDs to export"),
-      limit: z
-        .number()
-        .optional()
-        .describe("Optional limit for listing recipes"),
-      offset: z
-        .number()
-        .optional()
-        .describe("Optional offset for listing recipes"),
-    }),
-    handler: async ({ ids, limit, offset }) => {
-      let recipes: any[] = [];
-      if (ids && ids.length > 0) {
-        for (const id of ids) {
-          try {
-            const r = await api.getRecipe(id);
-            recipes.push(r);
-          } catch (err) {
-            // skip missing
-          }
-        }
-      } else {
-        const res = await api.listRecipes({ limit, offset } as any);
-        recipes = res.recipes || [];
+      let resultText = `Created recipe ${created.id} - ${created.name || params.name}`;
+      if (createdIngredients.length > 0) {
+        resultText += `\n\nAlso created ${createdIngredients.length} new ingredient(s):\n`;
+        createdIngredients.forEach((id, idx) => {
+          resultText += `  ${idx + 1}. ${id}\n`;
+        });
       }
 
-      // Generate a PDF bundle from recipes and return as base64 data URL
-      const pdfBase64 = await (async function generatePdf(recipesArr: any[]) {
-        return new Promise<string>((resolve, reject) => {
-          try {
-            const doc = new PDFDocument({ autoFirstPage: false });
-            const pass = new PassThrough();
-            const chunks: Buffer[] = [];
-            doc.pipe(pass);
-            pass.on("data", (chunk: Buffer) => chunks.push(chunk));
-            pass.on("end", () => {
-              const buf = Buffer.concat(chunks);
-              resolve(buf.toString("base64"));
-            });
-            pass.on("error", (err) => reject(err));
-
-            if (recipesArr.length === 0) {
-              doc.addPage();
-              doc
-                .fontSize(14)
-                .text("No recipes to export", { align: "center" });
-            }
-
-            for (const r of recipesArr) {
-              doc.addPage({ margin: 40 });
-              doc
-                .fontSize(16)
-                .text(r.name || "Unnamed recipe", { underline: true });
-              doc.moveDown(0.5);
-              doc.fontSize(10).text(`ID: ${r.id || "N/A"}`);
-              if (r.servings) doc.text(`Servings: ${r.servings}`);
-              if (r.tags && r.tags.length)
-                doc.text(`Tags: ${r.tags.join(", ")}`);
-              doc.moveDown(0.5);
-
-              if (r.description) {
-                doc.fontSize(12).text("Description:");
-                doc.fontSize(10).text(r.description);
-                doc.moveDown(0.5);
-              }
-
-              doc.fontSize(12).text("Ingredients:");
-              doc.fontSize(10);
-              if (r.ingredients && r.ingredients.length) {
-                for (const ing of r.ingredients) {
-                  const quantityText =
-                    ing.unit === "free_text"
-                      ? ing.quantityText || ""
-                      : `${ing.quantity ?? ""} ${ing.unit ?? ""}`;
-                  doc.text(
-                    `- ${quantityText} (Ingredient ID: ${ing.ingredientId || ing.id || ""})${ing.note ? ` — ${ing.note}` : ""}`,
-                  );
-                }
-              } else {
-                doc.text("- None");
-              }
-
-              doc.moveDown(0.5);
-              doc.fontSize(12).text("Steps:");
-              doc.fontSize(10);
-              if (r.steps && r.steps.length) {
-                for (let i = 0; i < r.steps.length; i++) {
-                  const step = r.steps[i];
-                  doc.text(`${i + 1}. ${step.text}`);
-                }
-              } else {
-                doc.text("- None");
-              }
-            }
-
-            doc.end();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      })(recipes);
-
-      const dataUrl = `data:application/pdf;base64,${pdfBase64}`;
-
       return {
         content: [
           {
             type: "text" as const,
-            text: dataUrl,
+            text: resultText,
           },
         ],
       };
