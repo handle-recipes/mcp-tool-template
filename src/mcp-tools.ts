@@ -212,6 +212,95 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   }),
 
   createMCPTool({
+    name: "create_recipe",
+    description:
+      "Create a new recipe with ingredients and steps. Each ingredient needs an ingredientId (use list_ingredients to find IDs) and a unit. For standard units set quantity (number) and unit. For freeform amounts like 'a pinch', set unit to 'free_text' and use quantityText instead.",
+    schema: z.object({
+      name: z.string().describe("Name of the recipe"),
+      description: z.string().describe("Description of the recipe"),
+      servings: z.number().describe("Number of servings"),
+      ingredients: z
+        .array(
+          z.object({
+            ingredientId: z.string().describe("ID of the ingredient"),
+            quantity: z
+              .number()
+              .optional()
+              .describe("Numeric quantity (omit for free_text unit)"),
+            unit: z
+              .enum([
+                "g", "kg", "ml", "l", "oz", "lb",
+                "tsp", "tbsp", "fl oz", "cup",
+                "pint", "quart", "gallon", "piece", "free_text",
+              ])
+              .describe("Unit of measurement, or 'free_text' for freeform amounts"),
+            quantityText: z
+              .string()
+              .optional()
+              .describe("Text quantity when unit is 'free_text', e.g. 'a pinch'"),
+            note: z
+              .string()
+              .optional()
+              .describe("Optional note, e.g. 'finely chopped'"),
+          })
+        )
+        .describe("List of ingredients for the recipe"),
+      steps: z
+        .array(
+          z.object({
+            text: z.string().describe("Instruction text for this step"),
+            equipment: z
+              .array(z.string())
+              .optional()
+              .describe("Optional equipment needed for this step"),
+          })
+        )
+        .describe("Ordered list of recipe steps"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Optional tags, e.g. ['vegan', 'spicy']"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Optional categories, e.g. ['dessert', 'norwegian']"),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe("Optional source URL for attribution"),
+    }),
+    handler: async ({ name, description, servings, ingredients, steps, tags, categories, sourceUrl }) => {
+      const recipe = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Recipe created successfully!\n` +
+              `Name: ${recipe.name}\n` +
+              `ID: ${recipe.id}\n` +
+              `Servings: ${recipe.servings}\n` +
+              `Ingredients: ${recipe.ingredients.length}\n` +
+              `Steps: ${recipe.steps.length}\n` +
+              `Tags: ${recipe.tags?.join(", ") || "None"}\n` +
+              `Categories: ${recipe.categories?.join(", ") || "None"}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
     name: "list_suggestions",
     description: "List suggestions with optional pagination and status filtering",
     schema: z.object({
