@@ -3,7 +3,7 @@ import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
 import { UNIT } from "./types";
 
-const unitEnum = z.enum(UNIT as [string, ...string[]] as [typeof UNIT[number], ...typeof UNIT[number][]]);
+const unitEnum = z.enum([...UNIT]);
 
 const recipeIngredientSchema = z.object({
   ingredientId: z.string().describe("ID of the ingredient"),
