@@ -1,6 +1,26 @@
 import { z } from "zod";
 import { createMCPTool } from "./lib/mcp-tool-helper";
 import { FirebaseFunctionsAPI } from "./api";
+import { UNIT } from "./types";
+
+// Zod schema for Unit enum
+const UnitSchema = z.enum(UNIT);
+
+// Zod schema for RecipeIngredient
+const RecipeIngredientSchema = z.object({
+  ingredientId: z.string().describe("ID of the ingredient"),
+  quantity: z.number().optional().describe("Quantity (use with standard units, not free_text)"),
+  unit: UnitSchema.describe("Unit type (g, kg, ml, l, oz, lb, tsp, tbsp, fl oz, cup, pint, quart, gallon, piece, free_text)"),
+  quantityText: z.string().optional().describe("Text quantity (use when unit is 'free_text', e.g., 'a pinch', 'to taste')"),
+  note: z.string().optional().describe("Additional note (e.g., 'finely chopped')"),
+});
+
+// Zod schema for RecipeStep
+const RecipeStepSchema = z.object({
+  text: z.string().describe("Instruction text for this step"),
+  imageUrl: z.string().optional().describe("Optional image URL for this step"),
+  equipment: z.array(z.string()).optional().describe("Optional equipment needed for this step"),
+});
 
 export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
   createMCPTool({
@@ -246,6 +266,87 @@ export const createRecipeTools = (api: FirebaseFunctionsAPI) => [
             text:
               `Found ${result.suggestions.length} suggestions${status ? ` with status "${status}"` : ""}:\n\n${suggestionsList}\n\n` +
               `Has more results: ${result.hasMore}`,
+          },
+        ],
+      };
+    },
+  }),
+
+  createMCPTool({
+    name: "create_recipe",
+    description: "Create a new recipe with ingredients and steps",
+    schema: z.object({
+      name: z.string().describe("Name of the recipe"),
+      description: z.string().describe("Description of the recipe"),
+      servings: z.number().describe("Number of servings"),
+      ingredients: z
+        .array(RecipeIngredientSchema)
+        .describe("List of ingredients with quantities and units"),
+      steps: z
+        .array(RecipeStepSchema)
+        .describe("List of cooking steps/instructions"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Optional tags (e.g., 'vegan', 'spicy')"),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe("Optional categories (e.g., 'dessert', 'main course')"),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe("Optional source URL for the recipe"),
+    }),
+    handler: async ({ name, description, servings, ingredients, steps, tags, categories, sourceUrl }) => {
+      const recipe = await api.createRecipe({
+        name,
+        description,
+        servings,
+        ingredients,
+        steps,
+        tags,
+        categories,
+        sourceUrl,
+      });
+
+      const ingredientsList = recipe.ingredients
+        .map((ing) => {
+          const quantityText =
+            ing.unit === "free_text"
+              ? ing.quantityText
+              : `${ing.quantity || ""} ${ing.unit}`;
+          return `- ${quantityText} (Ingredient ID: ${ing.ingredientId})${
+            ing.note ? ` - ${ing.note}` : ""
+          }`;
+        })
+        .join("\n");
+
+      const stepsList = recipe.steps
+        .map(
+          (step, i) =>
+            `${i + 1}. ${step.text}${
+              step.equipment ? ` (Equipment: ${step.equipment.join(", ")})` : ""
+            }`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Recipe created successfully!\n\n` +
+              `Name: ${recipe.name}\n` +
+              `ID: ${recipe.id}\n` +
+              `Slug: ${recipe.slug}\n` +
+              `Description: ${recipe.description}\n` +
+              `Servings: ${recipe.servings}\n` +
+              `Tags: ${recipe.tags?.join(", ") || "None"}\n` +
+              `Categories: ${recipe.categories?.join(", ") || "None"}\n` +
+              `Source URL: ${recipe.sourceUrl || "None"}\n\n` +
+              `Ingredients:\n${ingredientsList}\n\n` +
+              `Steps:\n${stepsList}`,
           },
         ],
       };
